@@ -1,8 +1,8 @@
-"""Intent Explorer home page."""
+"""Invoca Intent Explorer — home page."""
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 import sys
 from zoneinfo import ZoneInfo
@@ -12,26 +12,14 @@ import plotly.express as px
 import streamlit as st
 
 _THIS_FILE = Path(__file__).resolve()
-_PROJECT_ROOT = _THIS_FILE.parents[2] if _THIS_FILE.parent.name == "pages" else _THIS_FILE.parents[1]
+_PROJECT_ROOT = _THIS_FILE.parents[1]
 if str(_PROJECT_ROOT) not in sys.path:
-    # Keep package imports stable when Streamlit executes files by path.
     sys.path.insert(0, str(_PROJECT_ROOT))
 
-from invoca_intent_portal.lib.data_access import (
-    get_calls_df,
-    get_data_freshness_snapshot,
-    get_intent_summary_df,
-    get_pipeline_snapshot,
-)
-from invoca_intent_portal.lib.filter_state import CallFilters
-from invoca_intent_portal.lib.sidebar_filters import build_active_filter_summary, render_call_filter_sidebar
 from invoca_intent_portal.lib.auth import check_password
 from invoca_intent_portal.lib.supabase_client import require_supabase_client
-from invoca_intent_portal.lib.ui import (
-    apply_base_styles,
-    apply_chart_defaults,
-    render_pipeline_health_panel,
-)
+from invoca_intent_portal.lib.db import get_analyzed_calls, get_brands
+from invoca_intent_portal.lib.ui import apply_base_styles, apply_chart_defaults
 
 st.set_page_config(
     page_title="Invoca Intent Explorer",
@@ -42,98 +30,66 @@ apply_base_styles()
 check_password()
 
 st.title("Invoca Intent Explorer")
-st.caption("North star: insight quality for intent, confusion, repositioning, and outcomes.")
+st.caption("BC call analysis: caller intent, brand confusion, agent quality.")
 
 client = require_supabase_client()
 pt_today = datetime.now(ZoneInfo("America/Los_Angeles")).date()
 
+# ── Sidebar: 2 filters ──────────────────────────────────────────────────
 with st.sidebar:
-    sidebar_selection = render_call_filter_sidebar(
-        client=client,
-        page_key="home",
-        pt_today=pt_today,
-        date_presets=[
-            ("Yesterday (PT)", "yesterday"),
-            ("Last 7 Days (PT)", "last_7"),
-            ("Last 14 Days (PT)", "last_14"),
-            ("Custom", "custom"),
-        ],
-        default_preset_index=0,
-        custom_days_default=14,
+    st.header("Filters")
+
+    date_preset = st.selectbox(
+        "Date Range",
+        options=["Yesterday", "Last 7 Days", "Last 14 Days", "Custom"],
+        index=1,
     )
 
-start_date = sidebar_selection.start_date
-end_date = sidebar_selection.end_date
-selected_filters: CallFilters = sidebar_selection.filters
-selected_brand = selected_filters.brand_code
-selected_media_source = selected_filters.media_source
-selected_campaign = selected_filters.campaign_name
-selected_campaign_query = selected_filters.campaign_query
-selected_publisher = selected_filters.publisher
-selected_channel = selected_filters.channel
-selected_advertiser = selected_filters.advertiser_name
-selected_advertiser_query = selected_filters.advertiser_query
-selected_utm_source = selected_filters.utm_source
-selected_utm_campaign = selected_filters.utm_campaign
-selected_device = selected_filters.device_type
-selected_region = selected_filters.geo_region
-selected_city = selected_filters.geo_city
-selected_status = selected_filters.call_status
+    if date_preset == "Yesterday":
+        start_date = pt_today - timedelta(days=1)
+        end_date = start_date
+    elif date_preset == "Last 7 Days":
+        start_date = pt_today - timedelta(days=6)
+        end_date = pt_today
+    elif date_preset == "Last 14 Days":
+        start_date = pt_today - timedelta(days=13)
+        end_date = pt_today
+    else:
+        date_range = st.date_input(
+            "Date Range (PT)",
+            value=(pt_today - timedelta(days=13), pt_today),
+            max_value=pt_today,
+        )
+        if isinstance(date_range, tuple) and len(date_range) == 2:
+            start_date, end_date = date_range[0], date_range[1]
+        else:
+            start_date = pt_today - timedelta(days=13)
+            end_date = pt_today
 
+    brands = get_brands(client)
+    brand_options = ["ALL"] + [b["brand_code"] for b in brands]
+    brand_labels = {"ALL": "All Brands"}
+    for b in brands:
+        brand_labels[b["brand_code"]] = f"{b['brand_code']} - {b['brand_name']}"
 
-def _active_filter_summary() -> str:
-    return build_active_filter_summary(selected_filters)
+    selected_brand = st.selectbox(
+        "Brand",
+        options=brand_options,
+        index=0,
+        format_func=lambda x: brand_labels.get(x, x),
+    )
 
+    brand_filter = None if selected_brand == "ALL" else selected_brand
 
-try:
-    pipeline_snapshot = get_pipeline_snapshot(client)
-    freshness_snapshot = get_data_freshness_snapshot(client)
-    render_pipeline_health_panel(pipeline_snapshot, freshness_snapshot)
-except Exception:
-    st.caption("Pipeline health data not available.")
-
+# ── Load data ────────────────────────────────────────────────────────────
 try:
     with st.spinner("Loading data..."):
-        summary_df = get_intent_summary_df(
-            client=client,
+        calls_df = get_analyzed_calls(
+            client,
             start_date=start_date,
             end_date=end_date,
-            brand_code=selected_brand,
-            media_source=selected_media_source,
-            campaign_name=selected_campaign,
-            campaign_query=selected_campaign_query,
-            publisher=selected_publisher,
-            channel=selected_channel,
-            advertiser_name=selected_advertiser,
-            advertiser_query=selected_advertiser_query,
-            utm_source=selected_utm_source,
-            utm_campaign=selected_utm_campaign,
-            device_type=selected_device,
-            geo_region=selected_region,
-            geo_city=selected_city,
-            call_status=selected_status,
-            filters=selected_filters,
-        )
-        calls_df = get_calls_df(
-            client=client,
-            start_date=start_date,
-            end_date=end_date,
-            brand_code=selected_brand,
+            brand_code=brand_filter,
             limit=5000,
-            media_source=selected_media_source,
-            campaign_name=selected_campaign,
-            campaign_query=selected_campaign_query,
-            publisher=selected_publisher,
-            channel=selected_channel,
-            advertiser_name=selected_advertiser,
-            advertiser_query=selected_advertiser_query,
-            utm_source=selected_utm_source,
-            utm_campaign=selected_utm_campaign,
-            device_type=selected_device,
-            geo_region=selected_region,
-            geo_city=selected_city,
-            call_status=selected_status,
-            filters=selected_filters,
         )
 except Exception as e:
     st.error(f"Error loading data: {e}")
@@ -143,27 +99,43 @@ if calls_df.empty:
     st.warning("No calls found for this filter window.")
     st.stop()
 
-st.markdown(f"<div class='portal-filter-summary'>{_active_filter_summary()}</div>", unsafe_allow_html=True)
+# ── KPI row (4 metrics) ─────────────────────────────────────────────────
+analyzed_mask = calls_df["caller_intent"].notna()
+analyzed_count = int(analyzed_mask.sum())
+total_count = len(calls_df)
 
-calls_count = len(calls_df)
-confusion_rate = float(calls_df["brand_confusion"].fillna(False).mean() * 100)
-avg_quality = float(calls_df["agent_quality_score"].dropna().mean()) if "agent_quality_score" in calls_df else 0.0
-avg_confidence = float(calls_df["intent_confidence"].dropna().mean()) if "intent_confidence" in calls_df else 0.0
+confusion_rate = 0.0
+if analyzed_count > 0:
+    confusion_rate = float(
+        calls_df.loc[analyzed_mask, "brand_confusion"].fillna(False).mean() * 100
+    )
+
+avg_quality = 0.0
+if "agent_quality_score" in calls_df.columns:
+    quality_vals = calls_df["agent_quality_score"].dropna()
+    if len(quality_vals) > 0:
+        avg_quality = float(quality_vals.mean())
+
+top_intent = "n/a"
+if analyzed_count > 0:
+    intent_counts = calls_df.loc[analyzed_mask, "caller_intent"].value_counts()
+    if not intent_counts.empty:
+        top_intent = str(intent_counts.index[0])
 
 m1, m2, m3, m4 = st.columns(4)
-m1.metric("Calls", f"{calls_count:,}")
+m1.metric("Total Calls", f"{total_count:,}")
 m2.metric("Brand Confusion Rate", f"{confusion_rate:.1f}%")
-m3.metric("Avg Agent Quality", f"{avg_quality:.2f}")
-m4.metric("Avg Intent Confidence", f"{avg_confidence:.1f}")
+m3.metric("Avg Agent Quality", f"{avg_quality:.1f}" if avg_quality else "n/a")
+m4.metric("Most Common Intent", top_intent)
 
+# ── Charts (2 columns) ──────────────────────────────────────────────────
 chart_col_1, chart_col_2 = st.columns(2)
 
 with chart_col_1:
     st.subheader("Intent Distribution")
-    st.markdown("<div class='portal-section-caption'>Distribution of analyzed caller intents.</div>", unsafe_allow_html=True)
-    if "caller_intent" in calls_df and calls_df["caller_intent"].notna().any():
+    if analyzed_count > 0:
         pie_data = (
-            calls_df["caller_intent"]
+            calls_df.loc[analyzed_mask, "caller_intent"]
             .fillna("unknown")
             .value_counts()
             .rename_axis("caller_intent")
@@ -174,12 +146,11 @@ with chart_col_1:
         fig_pie.update_layout(legend_title_text="Intent")
         st.plotly_chart(fig_pie, use_container_width=True)
     else:
-        st.info("No analyzed intent rows in current window yet.")
+        st.info("No analyzed calls in current window.")
 
 with chart_col_2:
     st.subheader("Outcome Breakdown")
-    st.markdown("<div class='portal-section-caption'>Outcome labels for analyzed calls.</div>", unsafe_allow_html=True)
-    if "call_outcome" in calls_df and calls_df["call_outcome"].notna().any():
+    if "call_outcome" in calls_df.columns and calls_df["call_outcome"].notna().any():
         out_data = (
             calls_df["call_outcome"]
             .fillna("unknown")
@@ -192,92 +163,44 @@ with chart_col_2:
         fig_out.update_layout(xaxis_title=None)
         st.plotly_chart(fig_out, use_container_width=True)
     else:
-        st.info("No analyzed outcomes in current window yet.")
+        st.info("No analyzed outcomes in current window.")
 
+# ── Daily trend line ─────────────────────────────────────────────────────
 st.subheader("Daily Intent Trend")
-if not summary_df.empty:
-    trend_df = summary_df.groupby(["call_date", "caller_intent"], as_index=False)["total_calls"].sum()
-    fig_trend = px.line(trend_df, x="call_date", y="total_calls", color="caller_intent")
+if analyzed_count > 0:
+    trend_base = calls_df.loc[analyzed_mask].copy()
+    trend_base["call_date"] = pd.to_datetime(
+        trend_base["call_date_pt"], errors="coerce"
+    )
+    trend_df = (
+        trend_base.groupby(["call_date", "caller_intent"], as_index=False)
+        .size()
+        .rename(columns={"size": "calls"})
+    )
+    fig_trend = px.line(trend_df, x="call_date", y="calls", color="caller_intent")
     apply_chart_defaults(fig_trend)
     fig_trend.update_layout(yaxis_title="Calls")
     st.plotly_chart(fig_trend, use_container_width=True)
 else:
-    st.info("No summary rows available yet for this date window.")
+    st.info("No analyzed data for trend chart.")
 
-st.subheader("Top Elements")
-top_col_1, top_col_2, top_col_3, top_col_4 = st.columns(4)
-
-def _top_counts(df: pd.DataFrame, col: str, n: int = 8) -> pd.DataFrame:
-    if col not in df.columns:
-        return pd.DataFrame(columns=[col, "count"])
-    out = (
-        df[col]
-        .fillna("unknown")
-        .astype(str)
-        .str.strip()
-        .replace("", "unknown")
-        .value_counts()
-        .head(n)
-        .rename_axis(col)
-        .reset_index(name="count")
-    )
-    return out
-
-
-with top_col_1:
-    st.markdown("**Media Source**")
-    top_media = _top_counts(calls_df, "media_source")
-    st.dataframe(top_media, use_container_width=True, hide_index=True)
-
-with top_col_2:
-    st.markdown("**Campaign**")
-    top_campaign = _top_counts(calls_df, "campaign_name")
-    st.dataframe(top_campaign, use_container_width=True, hide_index=True)
-
-with top_col_3:
-    st.markdown("**Publisher**")
-    top_publisher = _top_counts(calls_df, "publisher")
-    st.dataframe(top_publisher, use_container_width=True, hide_index=True)
-
-with top_col_4:
-    st.markdown("**Channel**")
-    top_channel = _top_counts(calls_df, "channel")
-    st.dataframe(top_channel, use_container_width=True, hide_index=True)
-
+# ── Call table ───────────────────────────────────────────────────────────
 st.subheader("Call Table")
+
 show_cols = [
-    "id",
-    "invoca_call_id",
-    "call_date_pt",
-    "call_start_time",
-    "brand_code",
-    "advertiser_name",
-    "campaign_name",
-    "media_source",
-    "publisher",
-    "channel",
-    "duration_seconds",
-    "status",
-    "caller_intent",
-    "intent_confidence",
-    "call_outcome",
-    "brand_confusion",
-    "agent_quality_score",
+    "id", "invoca_call_id", "call_date_pt", "caller_intent",
+    "intent_confidence", "call_outcome", "brand_confusion",
+    "agent_quality_score", "caller_sentiment", "duration_seconds", "status",
 ]
 existing_cols = [c for c in show_cols if c in calls_df.columns]
-
 display_df = calls_df[existing_cols].copy()
-if "call_start_time" in display_df.columns:
-    display_df["call_start_time"] = pd.to_datetime(display_df["call_start_time"], utc=True, errors="coerce")
 
 st.dataframe(display_df, use_container_width=True, hide_index=True)
 
 csv_bytes = display_df.to_csv(index=False).encode("utf-8")
 st.download_button(
-    "Export Filtered CSV",
+    "Export CSV",
     data=csv_bytes,
     file_name=f"invoca_calls_{start_date}_{end_date}.csv",
     mime="text/csv",
 )
-
-st.caption("Use left navigation for Call Detail, Trends, and Review Queue.")
