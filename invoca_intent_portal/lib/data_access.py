@@ -124,7 +124,7 @@ def get_dimension_options(
         call_status=call_status,
     )
     return _get_dimension_options(
-        client=client,
+        client,
         column_name=column_name,
         start_date=start_date,
         end_date=end_date,
@@ -172,7 +172,7 @@ def get_calls_df(
         call_status=call_status,
     )
     return _get_calls_df(
-        client=client,
+        client,
         start_date=start_date,
         end_date=end_date,
         filters=resolved_filters,

@@ -25,17 +25,18 @@ from invoca_intent_portal.lib.data_access import (
 )
 from invoca_intent_portal.lib.filter_state import CallFilters
 from invoca_intent_portal.lib.sidebar_filters import build_active_filter_summary, render_call_filter_sidebar
-from invoca_intent_portal.lib.supabase_client import get_supabase_client
+from invoca_intent_portal.lib.supabase_client import require_supabase_client
 from invoca_intent_portal.lib.ui import (
     apply_base_styles,
+    apply_chart_defaults,
     render_pipeline_health_panel,
 )
 
-st.set_page_config(page_title="Trends Dashboard", page_icon="📈", layout="wide")
+st.set_page_config(page_title="Trends Dashboard", page_icon="\U0001F4C8", layout="wide")
 apply_base_styles()
 st.title("Trends Dashboard")
 
-client = get_supabase_client()
+client = require_supabase_client()
 pt_today = datetime.now(ZoneInfo("America/Los_Angeles")).date()
 
 with st.sidebar:
@@ -76,70 +77,77 @@ def _active_filter_summary() -> str:
     return build_active_filter_summary(selected_filters)
 
 
-pipeline_snapshot = get_pipeline_snapshot(client)
-freshness_snapshot = get_data_freshness_snapshot(client)
-render_pipeline_health_panel(pipeline_snapshot, freshness_snapshot)
+try:
+    pipeline_snapshot = get_pipeline_snapshot(client)
+    freshness_snapshot = get_data_freshness_snapshot(client)
+    render_pipeline_health_panel(pipeline_snapshot, freshness_snapshot)
+except Exception:
+    st.caption("Pipeline health data not available.")
 
-quality_df = get_quality_trends_df(
-    client=client,
-    start_date=start_date,
-    end_date=end_date,
-    brand_code=selected_brand,
-    media_source=selected_media_source,
-    campaign_name=selected_campaign,
-    campaign_query=selected_campaign_query,
-    publisher=selected_publisher,
-    channel=selected_channel,
-    advertiser_name=selected_advertiser,
-    advertiser_query=selected_advertiser_query,
-    utm_source=selected_utm_source,
-    utm_campaign=selected_utm_campaign,
-    device_type=selected_device,
-    geo_region=selected_region,
-    geo_city=selected_city,
-    call_status=selected_status,
-    filters=selected_filters,
-)
-confusion_df = get_confusion_patterns_df(
-    client=client,
-    start_date=start_date,
-    end_date=end_date,
-    brand_code=selected_brand,
-    media_source=selected_media_source,
-    campaign_name=selected_campaign,
-    campaign_query=selected_campaign_query,
-    publisher=selected_publisher,
-    channel=selected_channel,
-    advertiser_name=selected_advertiser,
-    advertiser_query=selected_advertiser_query,
-    utm_source=selected_utm_source,
-    utm_campaign=selected_utm_campaign,
-    device_type=selected_device,
-    geo_region=selected_region,
-    geo_city=selected_city,
-    call_status=selected_status,
-    filters=selected_filters,
-)
-reposition_df = get_repositioning_df(
-    client=client,
-    start_date=start_date,
-    end_date=end_date,
-    brand_code=selected_brand,
-    media_source=selected_media_source,
-    campaign_name=selected_campaign,
-    campaign_query=selected_campaign_query,
-    publisher=selected_publisher,
-    channel=selected_channel,
-    advertiser_name=selected_advertiser,
-    advertiser_query=selected_advertiser_query,
-    utm_source=selected_utm_source,
-    utm_campaign=selected_utm_campaign,
-    device_type=selected_device,
-    geo_region=selected_region,
-    geo_city=selected_city,
-    call_status=selected_status,
-    filters=selected_filters,
-)
+try:
+    quality_df = get_quality_trends_df(
+        client=client,
+        start_date=start_date,
+        end_date=end_date,
+        brand_code=selected_brand,
+        media_source=selected_media_source,
+        campaign_name=selected_campaign,
+        campaign_query=selected_campaign_query,
+        publisher=selected_publisher,
+        channel=selected_channel,
+        advertiser_name=selected_advertiser,
+        advertiser_query=selected_advertiser_query,
+        utm_source=selected_utm_source,
+        utm_campaign=selected_utm_campaign,
+        device_type=selected_device,
+        geo_region=selected_region,
+        geo_city=selected_city,
+        call_status=selected_status,
+        filters=selected_filters,
+    )
+    confusion_df = get_confusion_patterns_df(
+        client=client,
+        start_date=start_date,
+        end_date=end_date,
+        brand_code=selected_brand,
+        media_source=selected_media_source,
+        campaign_name=selected_campaign,
+        campaign_query=selected_campaign_query,
+        publisher=selected_publisher,
+        channel=selected_channel,
+        advertiser_name=selected_advertiser,
+        advertiser_query=selected_advertiser_query,
+        utm_source=selected_utm_source,
+        utm_campaign=selected_utm_campaign,
+        device_type=selected_device,
+        geo_region=selected_region,
+        geo_city=selected_city,
+        call_status=selected_status,
+        filters=selected_filters,
+    )
+    reposition_df = get_repositioning_df(
+        client=client,
+        start_date=start_date,
+        end_date=end_date,
+        brand_code=selected_brand,
+        media_source=selected_media_source,
+        campaign_name=selected_campaign,
+        campaign_query=selected_campaign_query,
+        publisher=selected_publisher,
+        channel=selected_channel,
+        advertiser_name=selected_advertiser,
+        advertiser_query=selected_advertiser_query,
+        utm_source=selected_utm_source,
+        utm_campaign=selected_utm_campaign,
+        device_type=selected_device,
+        geo_region=selected_region,
+        geo_city=selected_city,
+        call_status=selected_status,
+        filters=selected_filters,
+    )
+except Exception as e:
+    st.error(f"Error loading trend data: {e}")
+    st.stop()
 
 if quality_df.empty and confusion_df.empty and reposition_df.empty:
     st.warning("No trend data available for this date range.")
@@ -155,7 +163,8 @@ if not quality_df.empty:
         y=["avg_agent_quality", "confusion_rate_pct"],
         markers=True,
     )
-    fig_quality.update_layout(margin=dict(t=20, b=20, l=20, r=20), yaxis_title="Value")
+    apply_chart_defaults(fig_quality)
+    fig_quality.update_layout(yaxis_title="Value")
     st.plotly_chart(fig_quality, use_container_width=True)
 else:
     st.info("No quality trend rows yet.")
@@ -172,7 +181,8 @@ with trend_col_1:
             .head(12)
         )
         fig_conf = px.bar(top_conf, x="confusion_signal", y="signal_count")
-        fig_conf.update_layout(margin=dict(t=20, b=20, l=20, r=20), xaxis_title=None, yaxis_title="Mentions")
+        apply_chart_defaults(fig_conf)
+        fig_conf.update_layout(xaxis_title=None, yaxis_title="Mentions")
         st.plotly_chart(fig_conf, use_container_width=True)
     else:
         st.info("No confusion signals in this period.")
@@ -181,7 +191,8 @@ with trend_col_2:
     st.subheader("Repositioning Success Rate")
     if not reposition_df.empty:
         fig_rep = px.line(reposition_df, x="week_start", y="success_rate_pct", markers=True)
-        fig_rep.update_layout(margin=dict(t=20, b=20, l=20, r=20), yaxis_title="Success %")
+        apply_chart_defaults(fig_rep)
+        fig_rep.update_layout(yaxis_title="Success %")
         st.plotly_chart(fig_rep, use_container_width=True)
     else:
         st.info("No repositioning rows in this period.")

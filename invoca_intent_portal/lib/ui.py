@@ -5,16 +5,12 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
+import plotly.graph_objects as go
 import streamlit as st
 
+from invoca_intent_portal.lib.constants import MAIN_FILTER_PRESETS
 
-_MAIN_FILTER_PRESETS: dict[str, tuple[str, str]] = {
-    "All Calls": ("", ""),
-    "BC Focus": ("betterclaims", "5BC%"),
-    "LD Focus": ("defensores", "LD%"),
-    "AF Focus": ("accident fighters", "AF%"),
-    "1800LAW2 Focus": ("law2", "1800%"),
-}
+_MAIN_FILTER_PRESETS = MAIN_FILTER_PRESETS
 
 
 def apply_base_styles() -> None:
@@ -52,6 +48,15 @@ def apply_base_styles() -> None:
         """,
         unsafe_allow_html=True,
     )
+
+
+def apply_chart_defaults(fig: go.Figure) -> go.Figure:
+    """Apply consistent chart defaults, preventing Plotly 'undefined' title bug."""
+    fig.update_layout(
+        title=dict(text=""),
+        margin=dict(t=20, b=20, l=20, r=20),
+    )
+    return fig
 
 
 def format_timestamp_utc(value: Any) -> str:

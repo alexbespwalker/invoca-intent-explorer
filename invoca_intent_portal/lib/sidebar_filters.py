@@ -112,7 +112,7 @@ def render_call_filter_sidebar(
     with st.expander("Advanced Filters", expanded=False):
         for label, column_name, attr_name in _ADVANCED_DIMENSIONS:
             options = ["ALL"] + get_dimension_options(
-                client=client,
+                client,
                 column_name=column_name,
                 start_date=start_date,
                 end_date=end_date,

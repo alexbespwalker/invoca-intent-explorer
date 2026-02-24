@@ -7,6 +7,7 @@ from datetime import date
 from typing import Any
 
 import pandas as pd
+import streamlit as st
 
 from invoca_intent_portal.lib.filter_state import CallFilters
 
@@ -111,9 +112,10 @@ def _apply_call_filters(query: Any, filters: CallFilters | None) -> Any:
     return query
 
 
-def get_brands_df(client: Any) -> pd.DataFrame:
+@st.cache_data(ttl=3600, show_spinner=False)
+def get_brands_df(_client: Any) -> pd.DataFrame:
     rows = (
-        _table(client, "brands")
+        _table(_client, "brands")
         .select("brand_code,brand_name,active,priority")
         .eq("active", True)
         .order("priority", desc=False)
@@ -124,8 +126,9 @@ def get_brands_df(client: Any) -> pd.DataFrame:
     return _as_df(rows)
 
 
+@st.cache_data(ttl=3600, show_spinner=False)
 def get_dimension_options(
-    client: Any,
+    _client: Any,
     column_name: str,
     start_date: date,
     end_date: date,
@@ -133,7 +136,7 @@ def get_dimension_options(
     limit: int = 1000,
 ) -> list[str]:
     query = (
-        _table(client, "calls")
+        _table(_client, "calls")
         .select(column_name)
         .gte("call_date_pt", start_date.isoformat())
         .lte("call_date_pt", end_date.isoformat())
@@ -156,15 +159,16 @@ def get_dimension_options(
     return sorted(set(values))
 
 
+@st.cache_data(ttl=300, show_spinner=False)
 def get_calls_df(
-    client: Any,
+    _client: Any,
     start_date: date,
     end_date: date,
     filters: CallFilters | None = None,
     limit: int = 500,
 ) -> pd.DataFrame:
     query = (
-        _table(client, "calls")
+        _table(_client, "calls")
         .select(
             "id,invoca_call_id,call_record_id,brand_code,advertiser_name,campaign_name,"
             "call_date_pt,call_start_time,duration_seconds,status,transcript_word_count,"
@@ -186,7 +190,7 @@ def get_calls_df(
 
     call_ids = calls_df["id"].tolist()
     analysis_rows = (
-        _table(client, "analysis")
+        _table(_client, "analysis")
         .select(
             "call_id,analyzed_at,caller_intent,intent_confidence,brand_confusion,"
             "call_outcome,agent_quality_score,caller_sentiment,total_cost,validation_passed,"

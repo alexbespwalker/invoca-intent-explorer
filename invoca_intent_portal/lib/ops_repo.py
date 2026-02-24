@@ -4,14 +4,17 @@ from __future__ import annotations
 
 from typing import Any
 
+import streamlit as st
+
 
 def _table(client: Any, table_name: str) -> Any:
     return client.schema("invoca").table(table_name)
 
 
-def get_pipeline_snapshot(client: Any) -> dict[str, dict[str, Any] | None]:
+@st.cache_data(ttl=300, show_spinner=False)
+def get_pipeline_snapshot(_client: Any) -> dict[str, dict[str, Any] | None]:
     rows = (
-        _table(client, "pipeline_run_log")
+        _table(_client, "pipeline_run_log")
         .select(
             "id,workflow_name,run_context,started_at,finished_at,status,"
             "rows_discovered,rows_processed,rows_failed,error_summary,metadata"
@@ -39,9 +42,10 @@ def get_pipeline_snapshot(client: Any) -> dict[str, dict[str, Any] | None]:
     }
 
 
-def get_data_freshness_snapshot(client: Any) -> dict[str, Any]:
+@st.cache_data(ttl=300, show_spinner=False)
+def get_data_freshness_snapshot(_client: Any) -> dict[str, Any]:
     latest_call_row = (
-        _table(client, "calls")
+        _table(_client, "calls")
         .select("updated_at,discovered_at,acquired_at,call_start_time,call_date_pt,status")
         .order("updated_at", desc=True)
         .limit(1)
@@ -50,7 +54,7 @@ def get_data_freshness_snapshot(client: Any) -> dict[str, Any]:
         or []
     )
     latest_analysis_row = (
-        _table(client, "analysis")
+        _table(_client, "analysis")
         .select("analyzed_at")
         .order("analyzed_at", desc=True)
         .limit(1)

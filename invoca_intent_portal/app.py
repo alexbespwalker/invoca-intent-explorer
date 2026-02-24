@@ -25,9 +25,10 @@ from invoca_intent_portal.lib.data_access import (
 )
 from invoca_intent_portal.lib.filter_state import CallFilters
 from invoca_intent_portal.lib.sidebar_filters import build_active_filter_summary, render_call_filter_sidebar
-from invoca_intent_portal.lib.supabase_client import get_supabase_client
+from invoca_intent_portal.lib.supabase_client import require_supabase_client
 from invoca_intent_portal.lib.ui import (
     apply_base_styles,
+    apply_chart_defaults,
     render_pipeline_health_panel,
 )
 
@@ -41,7 +42,7 @@ apply_base_styles()
 st.title("Invoca Intent Explorer")
 st.caption("North star: insight quality for intent, confusion, repositioning, and outcomes.")
 
-client = get_supabase_client()
+client = require_supabase_client()
 pt_today = datetime.now(ZoneInfo("America/Los_Angeles")).date()
 
 with st.sidebar:
@@ -82,52 +83,59 @@ def _active_filter_summary() -> str:
     return build_active_filter_summary(selected_filters)
 
 
-pipeline_snapshot = get_pipeline_snapshot(client)
-freshness_snapshot = get_data_freshness_snapshot(client)
-render_pipeline_health_panel(pipeline_snapshot, freshness_snapshot)
+try:
+    pipeline_snapshot = get_pipeline_snapshot(client)
+    freshness_snapshot = get_data_freshness_snapshot(client)
+    render_pipeline_health_panel(pipeline_snapshot, freshness_snapshot)
+except Exception:
+    st.caption("Pipeline health data not available.")
 
-with st.spinner("Loading data..."):
-    summary_df = get_intent_summary_df(
-        client=client,
-        start_date=start_date,
-        end_date=end_date,
-        brand_code=selected_brand,
-        media_source=selected_media_source,
-        campaign_name=selected_campaign,
-        campaign_query=selected_campaign_query,
-        publisher=selected_publisher,
-        channel=selected_channel,
-        advertiser_name=selected_advertiser,
-        advertiser_query=selected_advertiser_query,
-        utm_source=selected_utm_source,
-        utm_campaign=selected_utm_campaign,
-        device_type=selected_device,
-        geo_region=selected_region,
-        geo_city=selected_city,
-        call_status=selected_status,
-        filters=selected_filters,
-    )
-    calls_df = get_calls_df(
-        client=client,
-        start_date=start_date,
-        end_date=end_date,
-        brand_code=selected_brand,
-        limit=5000,
-        media_source=selected_media_source,
-        campaign_name=selected_campaign,
-        campaign_query=selected_campaign_query,
-        publisher=selected_publisher,
-        channel=selected_channel,
-        advertiser_name=selected_advertiser,
-        advertiser_query=selected_advertiser_query,
-        utm_source=selected_utm_source,
-        utm_campaign=selected_utm_campaign,
-        device_type=selected_device,
-        geo_region=selected_region,
-        geo_city=selected_city,
-        call_status=selected_status,
-        filters=selected_filters,
-    )
+try:
+    with st.spinner("Loading data..."):
+        summary_df = get_intent_summary_df(
+            client=client,
+            start_date=start_date,
+            end_date=end_date,
+            brand_code=selected_brand,
+            media_source=selected_media_source,
+            campaign_name=selected_campaign,
+            campaign_query=selected_campaign_query,
+            publisher=selected_publisher,
+            channel=selected_channel,
+            advertiser_name=selected_advertiser,
+            advertiser_query=selected_advertiser_query,
+            utm_source=selected_utm_source,
+            utm_campaign=selected_utm_campaign,
+            device_type=selected_device,
+            geo_region=selected_region,
+            geo_city=selected_city,
+            call_status=selected_status,
+            filters=selected_filters,
+        )
+        calls_df = get_calls_df(
+            client=client,
+            start_date=start_date,
+            end_date=end_date,
+            brand_code=selected_brand,
+            limit=5000,
+            media_source=selected_media_source,
+            campaign_name=selected_campaign,
+            campaign_query=selected_campaign_query,
+            publisher=selected_publisher,
+            channel=selected_channel,
+            advertiser_name=selected_advertiser,
+            advertiser_query=selected_advertiser_query,
+            utm_source=selected_utm_source,
+            utm_campaign=selected_utm_campaign,
+            device_type=selected_device,
+            geo_region=selected_region,
+            geo_city=selected_city,
+            call_status=selected_status,
+            filters=selected_filters,
+        )
+except Exception as e:
+    st.error(f"Error loading data: {e}")
+    st.stop()
 
 if calls_df.empty:
     st.warning("No calls found for this filter window.")
@@ -160,7 +168,8 @@ with chart_col_1:
             .reset_index(name="count")
         )
         fig_pie = px.pie(pie_data, names="caller_intent", values="count", hole=0.45)
-        fig_pie.update_layout(margin=dict(t=20, b=20, l=20, r=20), legend_title_text="Intent")
+        apply_chart_defaults(fig_pie)
+        fig_pie.update_layout(legend_title_text="Intent")
         st.plotly_chart(fig_pie, use_container_width=True)
     else:
         st.info("No analyzed intent rows in current window yet.")
@@ -177,7 +186,8 @@ with chart_col_2:
             .reset_index(name="count")
         )
         fig_out = px.bar(out_data, x="call_outcome", y="count")
-        fig_out.update_layout(margin=dict(t=20, b=20, l=20, r=20), xaxis_title=None)
+        apply_chart_defaults(fig_out)
+        fig_out.update_layout(xaxis_title=None)
         st.plotly_chart(fig_out, use_container_width=True)
     else:
         st.info("No analyzed outcomes in current window yet.")
@@ -186,7 +196,8 @@ st.subheader("Daily Intent Trend")
 if not summary_df.empty:
     trend_df = summary_df.groupby(["call_date", "caller_intent"], as_index=False)["total_calls"].sum()
     fig_trend = px.line(trend_df, x="call_date", y="total_calls", color="caller_intent")
-    fig_trend.update_layout(margin=dict(t=20, b=20, l=20, r=20), yaxis_title="Calls")
+    apply_chart_defaults(fig_trend)
+    fig_trend.update_layout(yaxis_title="Calls")
     st.plotly_chart(fig_trend, use_container_width=True)
 else:
     st.info("No summary rows available yet for this date window.")

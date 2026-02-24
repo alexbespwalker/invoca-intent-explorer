@@ -18,14 +18,14 @@ from invoca_intent_portal.lib.data_access import (
     get_call_detail_by_invoca_id,
     get_call_detail_by_numeric_id,
 )
-from invoca_intent_portal.lib.supabase_client import get_supabase_client
+from invoca_intent_portal.lib.supabase_client import require_supabase_client
 from invoca_intent_portal.lib.ui import apply_base_styles
 
 st.set_page_config(page_title="Call Detail", page_icon="🔎", layout="wide")
 apply_base_styles()
 st.title("Call Detail")
 
-client = get_supabase_client()
+client = require_supabase_client()
 
 
 def _value_or_na(val: object) -> str:
@@ -34,21 +34,39 @@ def _value_or_na(val: object) -> str:
     text = str(val).strip()
     return text if text else "n/a"
 
-lookup = st.text_input("Lookup by Internal Call ID (number) or Invoca Call ID", value="")
+# Support deep links via ?call_id=... query parameter
+query_params = st.query_params
+initial_value = ""
+if "call_id" in query_params and not st.session_state.get("detail_call"):
+    initial_value = str(query_params["call_id"])
+
+lookup = st.text_input("Lookup by Internal Call ID (number) or Invoca Call ID", value=initial_value)
 load_clicked = st.button("Load Call", type="primary")
 
-if load_clicked and lookup.strip():
+# Auto-load from query param on first visit
+should_load = load_clicked and lookup.strip()
+if not should_load and initial_value and not st.session_state.get("detail_call"):
+    should_load = True
+
+if should_load and lookup.strip():
     key = lookup.strip()
-    if key.isdigit():
-        call, analyses = get_call_detail_by_numeric_id(client, int(key))
-    else:
-        call, analyses = get_call_detail_by_invoca_id(client, key)
+    try:
+        if key.isdigit():
+            call, analyses = get_call_detail_by_numeric_id(client, int(key))
+        else:
+            call, analyses = get_call_detail_by_invoca_id(client, key)
+    except Exception as e:
+        st.error(f"Error looking up call: {e}")
+        call, analyses = None, []
 
     st.session_state["detail_call"] = call
     st.session_state["detail_analyses"] = analyses
 
 call = st.session_state.get("detail_call")
 analyses = st.session_state.get("detail_analyses", [])
+
+if call is None and should_load:
+    st.warning(f"No call found for: {lookup.strip()}")
 
 if not call:
     st.info("Enter a call ID and click Load Call.")

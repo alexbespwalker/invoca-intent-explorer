@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 import pandas as pd
+import streamlit as st
 
 
 def _table(client: Any, table_name: str) -> Any:
@@ -18,8 +19,9 @@ def _as_df(data: list[dict[str, Any]]) -> pd.DataFrame:
     return pd.DataFrame(data)
 
 
-def get_review_queue_df(client: Any, status: str = "pending", limit: int = 200) -> pd.DataFrame:
-    query = _table(client, "review_queue").select("*").order("created_at", desc=True).limit(limit)
+@st.cache_data(ttl=300, show_spinner=False)
+def get_review_queue_df(_client: Any, status: str = "pending", limit: int = 200) -> pd.DataFrame:
+    query = _table(_client, "review_queue").select("*").order("created_at", desc=True).limit(limit)
     if status and status.lower() != "all":
         query = query.eq("status", status)
 
@@ -30,7 +32,7 @@ def get_review_queue_df(client: Any, status: str = "pending", limit: int = 200) 
 
     analysis_ids = queue_df["analysis_id"].dropna().astype(int).tolist()
     analysis_rows = (
-        _table(client, "analysis")
+        _table(_client, "analysis")
         .select(
             "id,call_id,caller_intent,intent_confidence,brand_confusion,"
             "call_outcome,agent_quality_score,validation_passed,analyzed_at"
@@ -44,7 +46,7 @@ def get_review_queue_df(client: Any, status: str = "pending", limit: int = 200) 
 
     call_ids = analysis_df["call_id"].dropna().astype(int).tolist() if not analysis_df.empty else []
     calls_rows = (
-        _table(client, "calls")
+        _table(_client, "calls")
         .select("id,invoca_call_id,brand_code,call_start_time,media_source,campaign_name,publisher,channel")
         .in_("id", call_ids)
         .execute()

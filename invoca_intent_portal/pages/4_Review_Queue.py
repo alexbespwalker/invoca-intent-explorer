@@ -14,18 +14,22 @@ if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
 from invoca_intent_portal.lib.data_access import get_review_queue_df, save_review_result
-from invoca_intent_portal.lib.supabase_client import get_supabase_client
+from invoca_intent_portal.lib.supabase_client import require_supabase_client
 from invoca_intent_portal.lib.ui import apply_base_styles
 
 st.set_page_config(page_title="Review Queue", page_icon="✅", layout="wide")
 apply_base_styles()
 st.title("Review Queue")
 
-client = get_supabase_client()
+client = require_supabase_client()
 
 status_filter = st.selectbox("Queue Status", options=["pending", "in_review", "completed", "skipped", "all"], index=0)
 
-queue_df = get_review_queue_df(client, status=status_filter, limit=300)
+try:
+    queue_df = get_review_queue_df(client, status=status_filter, limit=300)
+except Exception as e:
+    st.error(f"Error loading review queue: {e}")
+    st.stop()
 
 if queue_df.empty:
     st.info("No queue rows for this status.")
@@ -65,15 +69,18 @@ if submitted:
     if not reviewer.strip():
         st.error("Reviewer is required.")
     else:
-        save_review_result(
-            client=client,
-            queue_id=int(selected_queue_id),
-            reviewer=reviewer.strip(),
-            reviewer_score=reviewer_score,
-            accepted=accepted,
-            notes=notes,
-            disagreements=disagreements,
-            new_status=new_status,
-        )
-        st.success("Review result saved.")
-        st.rerun()
+        try:
+            save_review_result(
+                client=client,
+                queue_id=int(selected_queue_id),
+                reviewer=reviewer.strip(),
+                reviewer_score=reviewer_score,
+                accepted=accepted,
+                notes=notes,
+                disagreements=disagreements,
+                new_status=new_status,
+            )
+            st.success("Review result saved.")
+            st.rerun()
+        except Exception as e:
+            st.error(f"Error saving review: {e}")

@@ -23,7 +23,7 @@ def _get_analyzed_calls_df(
     filters: CallFilters | None = None,
 ) -> pd.DataFrame:
     calls_df = get_calls_df(
-        client=client,
+        client,
         start_date=start_date,
         end_date=end_date,
         filters=filters,
@@ -111,7 +111,7 @@ def get_confusion_patterns_df(
     filters: CallFilters | None = None,
 ) -> pd.DataFrame:
     calls_df = get_calls_df(
-        client=client,
+        client,
         start_date=start_date,
         end_date=end_date,
         filters=filters,
