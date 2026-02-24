@@ -8,8 +8,16 @@ import streamlit as st
 from supabase import Client, create_client
 
 
-def _secret_value(key: str) -> str | None:
-    """Read a key from Streamlit secrets if available."""
+def _secret_nested(section: str, key: str) -> str | None:
+    """Read a nested key from Streamlit secrets, e.g. st.secrets["database"]["url"]."""
+    try:
+        return st.secrets[section][key]
+    except (KeyError, TypeError, FileNotFoundError):
+        return None
+
+
+def _secret_flat(key: str) -> str | None:
+    """Read a flat key from Streamlit secrets, e.g. st.secrets["SUPABASE_URL"]."""
     try:
         return st.secrets.get(key)
     except Exception:
@@ -17,19 +25,29 @@ def _secret_value(key: str) -> str | None:
 
 
 def get_supabase_config() -> tuple[str, str]:
-    """Resolve Supabase URL + key from env vars or Streamlit secrets."""
-    url = os.getenv("SUPABASE_URL") or _secret_value("SUPABASE_URL")
+    """Resolve Supabase URL + key from env vars or Streamlit secrets.
+
+    Supports two TOML layouts:
+      1. Walker Brain style:  [database] url = "..." / key = "..."
+      2. Flat style:          SUPABASE_URL = "..." / SUPABASE_KEY = "..."
+    """
+    url = (
+        os.getenv("SUPABASE_URL")
+        or _secret_nested("database", "url")
+        or _secret_flat("SUPABASE_URL")
+    )
     key = (
         os.getenv("SUPABASE_SERVICE_KEY")
         or os.getenv("SUPABASE_KEY")
-        or _secret_value("SUPABASE_SERVICE_KEY")
-        or _secret_value("SUPABASE_KEY")
+        or _secret_nested("database", "key")
+        or _secret_flat("SUPABASE_SERVICE_KEY")
+        or _secret_flat("SUPABASE_KEY")
     )
 
     if not url or not key:
         raise RuntimeError(
-            "Missing Supabase configuration. Set SUPABASE_URL and "
-            "SUPABASE_SERVICE_KEY (or SUPABASE_KEY)."
+            "Missing Supabase configuration. Set [database] url/key "
+            "or SUPABASE_URL + SUPABASE_KEY in app secrets."
         )
 
     return str(url), str(key)
@@ -48,17 +66,22 @@ def require_supabase_client() -> Client:
     Validates config BEFORE calling the cached ``get_supabase_client()``
     so a ``StopException`` is never cached inside ``@st.cache_resource``.
     """
-    url = os.getenv("SUPABASE_URL") or _secret_value("SUPABASE_URL")
+    url = (
+        os.getenv("SUPABASE_URL")
+        or _secret_nested("database", "url")
+        or _secret_flat("SUPABASE_URL")
+    )
     key = (
         os.getenv("SUPABASE_SERVICE_KEY")
         or os.getenv("SUPABASE_KEY")
-        or _secret_value("SUPABASE_SERVICE_KEY")
-        or _secret_value("SUPABASE_KEY")
+        or _secret_nested("database", "key")
+        or _secret_flat("SUPABASE_SERVICE_KEY")
+        or _secret_flat("SUPABASE_KEY")
     )
     if not url or not key:
         st.error(
-            "Database not configured. Set SUPABASE_URL and "
-            "SUPABASE_SERVICE_KEY (or SUPABASE_KEY) in app secrets."
+            "Database not configured. Add [database] section with url/key "
+            "to app secrets (or set SUPABASE_URL + SUPABASE_KEY)."
         )
         st.stop()
     try:

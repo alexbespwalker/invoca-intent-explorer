@@ -14,11 +14,13 @@ if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
 from invoca_intent_portal.lib.data_access import get_review_queue_df, save_review_result
+from invoca_intent_portal.lib.auth import check_password
 from invoca_intent_portal.lib.supabase_client import require_supabase_client
 from invoca_intent_portal.lib.ui import apply_base_styles
 
-st.set_page_config(page_title="Review Queue", page_icon="✅", layout="wide")
+st.set_page_config(page_title="Review Queue", page_icon="\u2705", layout="wide")
 apply_base_styles()
+check_password()
 st.title("Review Queue")
 
 client = require_supabase_client()

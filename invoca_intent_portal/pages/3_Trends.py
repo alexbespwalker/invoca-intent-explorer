@@ -25,6 +25,7 @@ from invoca_intent_portal.lib.data_access import (
 )
 from invoca_intent_portal.lib.filter_state import CallFilters
 from invoca_intent_portal.lib.sidebar_filters import build_active_filter_summary, render_call_filter_sidebar
+from invoca_intent_portal.lib.auth import check_password
 from invoca_intent_portal.lib.supabase_client import require_supabase_client
 from invoca_intent_portal.lib.ui import (
     apply_base_styles,
@@ -34,6 +35,7 @@ from invoca_intent_portal.lib.ui import (
 
 st.set_page_config(page_title="Trends Dashboard", page_icon="\U0001F4C8", layout="wide")
 apply_base_styles()
+check_password()
 st.title("Trends Dashboard")
 
 client = require_supabase_client()

@@ -18,11 +18,13 @@ from invoca_intent_portal.lib.data_access import (
     get_call_detail_by_invoca_id,
     get_call_detail_by_numeric_id,
 )
+from invoca_intent_portal.lib.auth import check_password
 from invoca_intent_portal.lib.supabase_client import require_supabase_client
 from invoca_intent_portal.lib.ui import apply_base_styles
 
-st.set_page_config(page_title="Call Detail", page_icon="🔎", layout="wide")
+st.set_page_config(page_title="Call Detail", page_icon="\U0001F50E", layout="wide")
 apply_base_styles()
+check_password()
 st.title("Call Detail")
 
 client = require_supabase_client()
