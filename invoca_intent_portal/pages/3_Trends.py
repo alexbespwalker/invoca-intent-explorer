@@ -3,10 +3,18 @@
 from __future__ import annotations
 
 from datetime import datetime
+from pathlib import Path
+import sys
 from zoneinfo import ZoneInfo
 
 import plotly.express as px
 import streamlit as st
+
+_THIS_FILE = Path(__file__).resolve()
+_PROJECT_ROOT = _THIS_FILE.parents[2] if _THIS_FILE.parent.name == "pages" else _THIS_FILE.parents[1]
+if str(_PROJECT_ROOT) not in sys.path:
+    # Keep package imports stable when Streamlit executes files by path.
+    sys.path.insert(0, str(_PROJECT_ROOT))
 
 from invoca_intent_portal.lib.data_access import (
     get_confusion_patterns_df,
