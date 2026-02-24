@@ -23,6 +23,20 @@ SUPABASE_SERVICE_KEY = "<service_role_key>"
 # or SUPABASE_KEY
 ```
 
+## Streamlit Cloud deploy
+
+Use Streamlit Cloud UI:
+
+1. Open https://share.streamlit.io
+2. Click `Create app`
+3. Set repository to `alexbespwalker/invoca-intent-explorer`
+4. Set branch to `main`
+5. Set main file path to `invoca_intent_portal/app.py`
+6. Add secrets from `.streamlit/secrets.toml.example`
+7. Deploy
+
+App URL is assigned after deploy (typically `https://<app-name>.streamlit.app`).
+
 ## Main filters in dashboard
 
 - `Brand`
