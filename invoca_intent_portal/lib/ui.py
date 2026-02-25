@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html as _html
+from typing import Any
 
 import plotly.graph_objects as go
 import streamlit as st
@@ -40,6 +41,39 @@ CHART_COLORS = [
     "#f472b6",  # pink
     "#818cf8",  # indigo
 ]
+
+# ── Intent / Outcome color maps ───────────────────────────────────────────
+
+INTENT_COLORS: dict[str, tuple[str, str]] = {
+    # (text_color, bg_color)
+    "injury_new_case":     ("#34d399", "rgba(52,211,153,0.15)"),
+    "property_only":       ("#f59e0b", "rgba(245,158,11,0.15)"),
+    "already_represented": ("#a78bfa", "rgba(167,139,250,0.15)"),
+    "insurance_inquiry":   ("#fb7185", "rgba(251,113,133,0.15)"),
+    "existing_case":       ("#38bdf8", "rgba(56,189,248,0.15)"),
+    "wrong_number":        ("#94a3b8", "rgba(148,163,184,0.10)"),
+    "general_question":    ("#fbbf24", "rgba(251,191,36,0.15)"),
+    "spam":                ("#64748b", "rgba(100,116,139,0.10)"),
+    "other":               ("#94a3b8", "rgba(148,163,184,0.10)"),
+}
+
+OUTCOME_COLORS: dict[str, tuple[str, str]] = {
+    "connected":       ("#34d399", "rgba(52,211,153,0.15)"),
+    "callback_set":    ("#22d3ee", "rgba(34,211,238,0.15)"),
+    "caller_declined": ("#f59e0b", "rgba(245,158,11,0.15)"),
+    "not_applicable":  ("#94a3b8", "rgba(148,163,184,0.10)"),
+    "caller_dropped":  ("#fb7185", "rgba(251,113,133,0.15)"),
+    "wrong_number":    ("#64748b", "rgba(100,116,139,0.10)"),
+    "other":           ("#94a3b8", "rgba(148,163,184,0.10)"),
+}
+
+SENTIMENT_COLORS: dict[str, tuple[str, str]] = {
+    "positive":   ("#34d399", "rgba(52,211,153,0.15)"),
+    "neutral":    ("#94a3b8", "rgba(148,163,184,0.10)"),
+    "confused":   ("#f59e0b", "rgba(245,158,11,0.15)"),
+    "frustrated": ("#fb7185", "rgba(251,113,133,0.15)"),
+    "angry":      ("#ef4444", "rgba(239,68,68,0.15)"),
+}
 
 
 def apply_base_styles() -> None:
@@ -353,6 +387,7 @@ def apply_chart_defaults(fig: go.Figure) -> go.Figure:
 # ── Shared detail-panel helpers ──────────────────────────────────────────
 
 FLAG_STYLES: dict[str, tuple[str, str]] = {
+    "brand_confusion": ("background:#7f1d1d;color:#fca5a5;", "Brand Confusion"),
     "compliance_concern": ("background:#7f1d1d;color:#fca5a5;", "Compliance Concern"),
     "training_opportunity": ("background:#78350f;color:#fbbf24;", "Training Opportunity"),
     "exceptional_handling": ("background:#064e3b;color:#6ee7b7;", "Exceptional Handling"),
@@ -365,6 +400,11 @@ def val(obj: object) -> str:
         return "n/a"
     text = str(obj).strip()
     return text if text else "n/a"
+
+
+def _fmt(s: str) -> str:
+    """Format snake_case DB values into readable labels."""
+    return s.replace("_", " ").title() if s else s
 
 
 def chart_title(label: str) -> None:
@@ -385,3 +425,229 @@ def section_divider(label: str) -> None:
         f'{_html.escape(label)}</div>',
         unsafe_allow_html=True,
     )
+
+
+def badge_pill(label: str, text_color: str, bg_color: str) -> str:
+    """Return HTML for a colored badge pill."""
+    return (
+        f'<span style="display:inline-flex;align-items:center;'
+        f'padding:3px 10px;border-radius:6px;font-size:0.78em;font-weight:500;'
+        f'background:{bg_color};color:{text_color};'
+        f'border:1px solid {text_color}22;">'
+        f'{_html.escape(label)}</span>'
+    )
+
+
+def intent_pill(intent: str) -> str:
+    """Badge pill for a caller_intent value."""
+    tc, bg = INTENT_COLORS.get(intent, ("#94a3b8", "rgba(148,163,184,0.10)"))
+    return badge_pill(_fmt(intent), tc, bg)
+
+
+def outcome_pill(outcome: str) -> str:
+    """Badge pill for a call_outcome value."""
+    tc, bg = OUTCOME_COLORS.get(outcome, ("#94a3b8", "rgba(148,163,184,0.10)"))
+    return badge_pill(_fmt(outcome), tc, bg)
+
+
+def sentiment_pill(sentiment: str) -> str:
+    """Badge pill for a caller_sentiment value."""
+    tc, bg = SENTIMENT_COLORS.get(sentiment, ("#94a3b8", "rgba(148,163,184,0.10)"))
+    return badge_pill(_fmt(sentiment), tc, bg)
+
+
+def call_card(row: dict[str, Any], idx: int) -> None:
+    """Render a compact call summary card with expander for details."""
+    intent = str(row.get("caller_intent") or "other")
+    situation = str(row.get("caller_situation") or "")
+    outcome = str(row.get("call_outcome") or "other")
+    confidence = row.get("intent_confidence")
+    date_val = str(row.get("call_date_pt") or "")
+    duration = row.get("duration_seconds") or ""
+    sentiment = str(row.get("caller_sentiment") or "")
+    brand_confused = row.get("brand_confusion", False)
+    quality = row.get("agent_quality_score")
+
+    # First key quote preview
+    quotes = row.get("key_quotes")
+    quote_preview = ""
+    if quotes and isinstance(quotes, list) and quotes:
+        q = quotes[0]
+        if isinstance(q, dict):
+            quote_preview = q.get("quote", "")
+        else:
+            quote_preview = str(q)
+    if len(quote_preview) > 120:
+        quote_preview = quote_preview[:117] + "..."
+
+    # Truncate situation for card
+    situation_short = situation[:140] + "..." if len(situation) > 140 else situation
+
+    # Confidence color
+    conf_str = str(confidence) if confidence is not None else "—"
+    conf_color = "#34d399" if confidence and confidence >= 80 else (
+        "#f59e0b" if confidence and confidence >= 60 else "#fb7185"
+    )
+
+    # Brand confusion indicator
+    bc_dot = (
+        f' <span style="display:inline-block;width:6px;height:6px;border-radius:50%;'
+        f'background:#fb7185;margin-left:4px;" title="Brand confusion"></span>'
+        if brand_confused else ""
+    )
+
+    card_html = (
+        f'<div style="background:linear-gradient(145deg,#1a2740 0%,#1e293b 60%,#222f43 100%);'
+        f'border:1px solid #2d3b50;border-radius:12px;padding:0.8rem 1.1rem;'
+        f'margin-bottom:0.15rem;">'
+        # Row 1: intent pill + situation + date/duration
+        f'<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:0.35rem;">'
+        f'<div style="flex-shrink:0;">{intent_pill(intent)}{bc_dot}</div>'
+        f'<div style="flex:1;font-size:0.85rem;color:{COLORS["text_primary"]};line-height:1.4;">'
+        f'{_html.escape(situation_short)}</div>'
+        f'<div style="flex-shrink:0;text-align:right;font-size:0.75rem;color:{COLORS["text_muted"]};">'
+        f'{_html.escape(str(date_val))}<br>{_html.escape(str(duration))}s</div>'
+        f'</div>'
+    )
+
+    # Row 2: quote preview + outcome + confidence
+    if quote_preview:
+        card_html += (
+            f'<div style="display:flex;align-items:center;gap:10px;">'
+            f'<div style="flex:1;font-size:0.8rem;color:{COLORS["text_secondary"]};'
+            f'font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'
+            f'&ldquo;{_html.escape(quote_preview)}&rdquo;</div>'
+            f'<div style="flex-shrink:0;display:flex;align-items:center;gap:8px;">'
+            f'{outcome_pill(outcome)}'
+            f'<span style="font-size:0.75rem;color:{conf_color};font-family:\'JetBrains Mono\',monospace;">'
+            f'{conf_str}</span>'
+            f'</div></div>'
+        )
+    else:
+        card_html += (
+            f'<div style="display:flex;justify-content:flex-end;gap:8px;align-items:center;">'
+            f'{outcome_pill(outcome)}'
+            f'<span style="font-size:0.75rem;color:{conf_color};font-family:\'JetBrains Mono\',monospace;">'
+            f'{conf_str}</span>'
+            f'</div>'
+        )
+
+    card_html += '</div>'
+    st.markdown(card_html, unsafe_allow_html=True)
+
+
+def call_detail_panel(row: dict[str, Any], call_detail: dict[str, Any] | None, idx: int = 0) -> None:
+    """Render detail content inside an st.expander for a call."""
+    intent = str(row.get("caller_intent") or "other")
+    situation = str(row.get("caller_situation") or "No situation summary available.")
+    outcome = str(row.get("call_outcome") or "other")
+    sentiment = str(row.get("caller_sentiment") or "")
+    case_type = str(row.get("case_type") or "")
+    quality = row.get("agent_quality_score")
+    brand_confused = row.get("brand_confusion", False)
+    confidence = row.get("intent_confidence")
+    flags = row.get("flags")
+    quotes = row.get("key_quotes")
+    signals = row.get("confusion_signals")
+
+    # 1. Situation summary
+    st.markdown(
+        f'<div style="font-size:0.92rem;color:{COLORS["text_primary"]};line-height:1.5;'
+        f'margin-bottom:0.8rem;">{_html.escape(situation)}</div>',
+        unsafe_allow_html=True,
+    )
+
+    # 2. Key quotes (prominently)
+    if quotes and isinstance(quotes, list) and len(quotes) > 0:
+        section_divider("Key Quotes")
+        _quote_style = (
+            f'padding:0.6rem 1rem;margin:0.4rem 0;'
+            f'border-left:3px solid {COLORS["accent"]};'
+            f'background:linear-gradient(135deg,{COLORS["bg_elevated"]} 0%,#1e293b 100%);'
+            f'border:1px solid #2d3b50;border-left:3px solid {COLORS["accent"]};'
+            f'border-radius:0 10px 10px 0;'
+            f'font-style:italic;color:{COLORS["text_primary"]};font-size:0.86rem;'
+            f'line-height:1.6;'
+        )
+        for q in quotes:
+            text = q.get("quote", "") if isinstance(q, dict) else str(q)
+            ctx = q.get("context") if isinstance(q, dict) else None
+            st.markdown(
+                f'<div style="{_quote_style}">&ldquo;{_html.escape(text)}&rdquo;</div>',
+                unsafe_allow_html=True,
+            )
+            if ctx:
+                st.markdown(
+                    f'<div style="font-size:0.74rem;color:{COLORS["text_muted"]};'
+                    f'margin:-0.1rem 0 0.3rem 1.1rem;font-style:normal;">'
+                    f'{_html.escape(str(ctx))}</div>',
+                    unsafe_allow_html=True,
+                )
+
+    # 3. Analysis chips row
+    section_divider("Analysis")
+    chips = [
+        intent_pill(intent),
+        outcome_pill(outcome),
+    ]
+    if sentiment:
+        chips.append(sentiment_pill(sentiment))
+    if case_type and case_type != "not_applicable":
+        chips.append(badge_pill(_fmt(case_type), "#38bdf8", "rgba(56,189,248,0.15)"))
+    if quality is not None:
+        q_color = "#34d399" if quality >= 7 else ("#f59e0b" if quality >= 5 else "#fb7185")
+        chips.append(badge_pill(f"Quality: {quality}/10", q_color, f"{q_color}22"))
+    if confidence is not None:
+        c_color = "#34d399" if confidence >= 80 else ("#f59e0b" if confidence >= 60 else "#fb7185")
+        chips.append(badge_pill(f"Conf: {confidence}%", c_color, f"{c_color}22"))
+    if brand_confused:
+        chips.append(badge_pill("Brand Confused", "#fca5a5", "rgba(127,29,29,0.5)"))
+
+    st.markdown(
+        f'<div style="display:flex;gap:8px;flex-wrap:wrap;margin:0.3rem 0 0.8rem 0;">'
+        f'{"".join(chips)}</div>',
+        unsafe_allow_html=True,
+    )
+
+    # 4. Flags
+    if flags and isinstance(flags, list) and len(flags) > 0:
+        _default_style = f"background:{COLORS['bg_elevated']};color:{COLORS['text_secondary']};"
+        flag_html = " ".join(
+            f'<span style="{FLAG_STYLES.get(f, (_default_style,))[0]}'
+            f'padding:3px 10px;border-radius:6px;font-size:0.78em;font-weight:500;">'
+            f'{_html.escape(FLAG_STYLES.get(f, (None, _fmt(f)))[1])}</span>'
+            for f in flags
+        )
+        st.markdown(
+            f'<div style="margin:0 0 0.6rem 0;"><span style="font-size:0.72rem;font-weight:600;'
+            f'letter-spacing:0.06em;text-transform:uppercase;color:{COLORS["text_muted"]};'
+            f'margin-right:8px;">FLAGS</span>{flag_html}</div>',
+            unsafe_allow_html=True,
+        )
+
+    # 5. Confusion signals
+    if signals and isinstance(signals, list) and len(signals) > 0:
+        section_divider("Confusion Signals")
+        for sig in signals:
+            st.markdown(
+                f'<div style="padding:0.4rem 0.8rem;margin:0.3rem 0;'
+                f'border-left:3px solid {COLORS["rose"]};'
+                f'background:rgba(251,113,133,0.06);'
+                f'border-radius:0 8px 8px 0;'
+                f'color:{COLORS["text_secondary"]};font-size:0.84rem;'
+                f'line-height:1.5;">'
+                f'{_html.escape(str(sig))}</div>',
+                unsafe_allow_html=True,
+            )
+
+    # 6. Raw analysis JSON
+    raw = row.get("raw_analysis")
+    if raw:
+        with st.expander("Raw Analysis JSON", expanded=False):
+            import json
+            if isinstance(raw, str):
+                try:
+                    raw = json.loads(raw)
+                except Exception:
+                    pass
+            st.json(raw)
