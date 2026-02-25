@@ -35,6 +35,7 @@ def get_analyzed_calls(
             "call_date_pt,call_start_time,duration_seconds,status,"
             "transcript_word_count"
         )
+        .eq("status", "analyzed")
         .gte("call_date_pt", start_date.isoformat())
         .lte("call_date_pt", end_date.isoformat())
         .order("call_start_time", desc=True)

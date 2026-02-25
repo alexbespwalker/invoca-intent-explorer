@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+import html as _html
 from pathlib import Path
 import sys
 from zoneinfo import ZoneInfo
@@ -18,7 +19,7 @@ if str(_PROJECT_ROOT) not in sys.path:
 
 from invoca_intent_portal.lib.auth import check_password
 from invoca_intent_portal.lib.supabase_client import require_supabase_client
-from invoca_intent_portal.lib.db import get_analyzed_calls, get_brands
+from invoca_intent_portal.lib.db import get_analyzed_calls, get_brands, get_call_detail
 from invoca_intent_portal.lib.ui import apply_base_styles, apply_chart_defaults, CHART_COLORS
 
 
@@ -259,12 +260,22 @@ with row2_col2:
 
 # ── Call table ───────────────────────────────────────────────────────────
 st.subheader("Call Table")
+st.caption("Select a row to preview its transcript below.")
+
+# Extract first key quote as intent quote
+if "key_quotes" in calls_df.columns:
+    calls_df["intent_quote"] = calls_df["key_quotes"].apply(
+        lambda q: q[0]["quote"] if isinstance(q, list) and q and isinstance(q[0], dict) and "quote" in q[0] else ""
+    )
+else:
+    calls_df["intent_quote"] = ""
 
 show_cols = [
-    "id", "call_date_pt", "caller_intent",
-    "intent_confidence", "brand_confusion", "agent_quality_score",
-    "call_outcome", "case_type", "agent_repositioning_successful",
-    "caller_sentiment", "duration_seconds",
+    "invoca_call_id", "call_date_pt", "caller_intent",
+    "intent_quote", "intent_confidence", "brand_confusion",
+    "agent_quality_score", "call_outcome", "case_type",
+    "agent_repositioning_successful", "caller_sentiment",
+    "duration_seconds",
 ]
 existing_cols = [c for c in show_cols if c in calls_df.columns]
 display_df = calls_df[existing_cols].copy()
@@ -276,9 +287,10 @@ for col in ["caller_intent", "call_outcome", "case_type", "caller_sentiment"]:
 
 # Rename columns to human-readable headers
 display_df = display_df.rename(columns={
-    "id": "ID",
+    "invoca_call_id": "Call ID",
     "call_date_pt": "Date",
     "caller_intent": "Intent",
+    "intent_quote": "Intent Quote",
     "intent_confidence": "Confidence",
     "brand_confusion": "Brand Confused",
     "agent_quality_score": "Quality",
@@ -289,7 +301,151 @@ display_df = display_df.rename(columns={
     "duration_seconds": "Duration (s)",
 })
 
-st.dataframe(display_df, use_container_width=True, hide_index=True)
+# Map display rows back to DB IDs for on-click lookup
+row_id_map = calls_df.loc[display_df.index, "id"].tolist()
+
+selection = st.dataframe(
+    display_df,
+    use_container_width=True,
+    hide_index=True,
+    on_select="rerun",
+    selection_mode="single-row",
+)
+
+# ── Inline transcript panel ──────────────────────────────────────────
+if selection.selection.rows:
+    selected_idx = selection.selection.rows[0]
+    selected_call_id = str(row_id_map[selected_idx])
+    selected_row = display_df.iloc[selected_idx]
+
+    call_detail, _ = get_call_detail(client, selected_call_id)
+
+    if call_detail and call_detail.get("transcript_text"):
+        st.markdown(
+            '<div style="height:2px;margin:1.5rem 0 1rem 0;'
+            'background:linear-gradient(90deg,#22d3ee 0%,#a78bfa 50%,#f59e0b 100%);'
+            'border-radius:1px;opacity:0.5;"></div>',
+            unsafe_allow_html=True,
+        )
+
+        # Section label
+        st.markdown(
+            '<div style="font-size:0.72rem;font-weight:600;letter-spacing:0.1em;'
+            'text-transform:uppercase;color:#64748b;margin-bottom:0.5rem;">'
+            'Transcript Preview</div>',
+            unsafe_allow_html=True,
+        )
+
+        # Metadata header bar — single styled card header
+        call_label = _html.escape(str(selected_row.get("Call ID", selected_call_id)))
+        call_date = _html.escape(str(selected_row.get("Date", "")))
+        call_intent = _html.escape(str(selected_row.get("Intent", "")))
+        call_dur = _html.escape(str(selected_row.get("Duration (s)", "")))
+
+        st.markdown(
+            f'<div style="display:flex;gap:2rem;align-items:center;'
+            f'background:linear-gradient(135deg,#1e293b 0%,#273548 100%);'
+            f'border:1px solid #334155;border-radius:12px;'
+            f'padding:0.8rem 1.2rem;margin-bottom:0.8rem;">'
+            f'<div><span style="font-size:0.7rem;font-weight:600;letter-spacing:0.06em;'
+            f'text-transform:uppercase;color:#64748b;">Call ID</span><br>'
+            f'<span style="font-family:\'JetBrains Mono\',monospace;font-size:0.88rem;'
+            f'color:#22d3ee;">{call_label}</span></div>'
+            f'<div><span style="font-size:0.7rem;font-weight:600;letter-spacing:0.06em;'
+            f'text-transform:uppercase;color:#64748b;">Date</span><br>'
+            f'<span style="font-size:0.88rem;color:#e2e8f0;">{call_date}</span></div>'
+            f'<div><span style="font-size:0.7rem;font-weight:600;letter-spacing:0.06em;'
+            f'text-transform:uppercase;color:#64748b;">Intent</span><br>'
+            f'<span style="display:inline-block;margin-top:2px;padding:1px 8px;'
+            f'background:#164e6380;border-radius:5px;font-size:0.84rem;'
+            f'color:#22d3ee;">{call_intent}</span></div>'
+            f'<div><span style="font-size:0.7rem;font-weight:600;letter-spacing:0.06em;'
+            f'text-transform:uppercase;color:#64748b;">Duration</span><br>'
+            f'<span style="font-size:0.88rem;color:#e2e8f0;">{call_dur}s</span></div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+
+        # Word count indicator
+        _transcript_text = call_detail["transcript_text"]
+        _word_count = len(_transcript_text.split())
+        st.markdown(
+            f'<div style="font-size:0.75rem;color:#64748b;margin-bottom:0.4rem;'
+            f'font-family:\'JetBrains Mono\',monospace;">'
+            f'{_word_count:,} words</div>',
+            unsafe_allow_html=True,
+        )
+
+        # Style the transcript code block to match dark navy theme
+        st.markdown(
+            "<style>"
+            "div[data-testid='stCode'] {"
+            "  border: 1px solid #334155;"
+            "  border-radius: 10px;"
+            "  overflow: hidden;"
+            "}"
+            "div[data-testid='stCode'] pre {"
+            "  max-height: 420px;"
+            "  overflow-y: auto;"
+            "  background: #0f172a !important;"
+            "  color: #cbd5e1 !important;"
+            "  font-family: 'JetBrains Mono', monospace !important;"
+            "  font-size: 0.82rem !important;"
+            "  line-height: 1.7 !important;"
+            "  padding: 1rem 1.2rem !important;"
+            "}"
+            "div[data-testid='stCode'] pre::-webkit-scrollbar {"
+            "  width: 6px;"
+            "}"
+            "div[data-testid='stCode'] pre::-webkit-scrollbar-track {"
+            "  background: #1e293b;"
+            "}"
+            "div[data-testid='stCode'] pre::-webkit-scrollbar-thumb {"
+            "  background: #475569;"
+            "  border-radius: 3px;"
+            "}"
+            "</style>",
+            unsafe_allow_html=True,
+        )
+
+        # Transcript with native copy button
+        st.code(call_detail["transcript_text"], language=None, wrap_lines=True)
+
+        # Link to full detail page — styled as pill link
+        st.markdown(
+            f'<a href="/Call_Detail?call_id={selected_call_id}" target="_self" '
+            f'style="display:inline-block;margin-top:0.6rem;padding:0.45rem 1.2rem;'
+            f'background:#164e63;color:#22d3ee !important;border:1px solid #22d3ee33;'
+            f'border-radius:8px;font-size:0.82rem;font-weight:600;'
+            f'letter-spacing:0.02em;text-decoration:none !important;'
+            f'transition:all 0.2s ease;"'
+            f' onmouseover="this.style.background=\'#1e6a7a\';this.style.borderColor=\'#22d3ee66\'"'
+            f' onmouseout="this.style.background=\'#164e63\';this.style.borderColor=\'#22d3ee33\'"'
+            f'>Open full analysis &#8594;</a>',
+            unsafe_allow_html=True,
+        )
+    elif call_detail:
+        st.markdown(
+            '<div style="height:2px;margin:1.5rem 0 1rem 0;'
+            'background:linear-gradient(90deg,#22d3ee 0%,#a78bfa 50%,#f59e0b 100%);'
+            'border-radius:1px;opacity:0.5;"></div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            '<div style="font-size:0.72rem;font-weight:600;letter-spacing:0.1em;'
+            'text-transform:uppercase;color:#64748b;margin-bottom:0.5rem;">'
+            'Transcript Preview</div>',
+            unsafe_allow_html=True,
+        )
+        st.warning("This call has no transcript text yet.")
+    else:
+        st.markdown(
+            '<div style="height:2px;margin:1.5rem 0 1rem 0;'
+            'background:linear-gradient(90deg,#22d3ee 0%,#a78bfa 50%,#f59e0b 100%);'
+            'border-radius:1px;opacity:0.5;"></div>',
+            unsafe_allow_html=True,
+        )
+        st.error(f"Could not load call {selected_call_id}.")
 
 csv_bytes = display_df.to_csv(index=False).encode("utf-8")
 st.download_button(
