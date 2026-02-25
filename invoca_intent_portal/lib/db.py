@@ -146,3 +146,46 @@ def get_call_detail(
         or []
     )
     return call, analysis_rows
+
+
+# ── Auth helpers ─────────────────────────────────────────────────────────
+
+def authenticate_user(
+    client: Any, email: str, password: str,
+) -> dict[str, Any] | None:
+    """Authenticate via RPC. Returns user dict or None."""
+    resp = client.rpc(
+        "authenticate_portal_user",
+        {"p_email": email, "p_password": password},
+    ).execute()
+    rows = resp.data or []
+    return rows[0] if rows else None
+
+
+def create_session(client: Any, user_id: int) -> str:
+    """Create a DB-backed session token."""
+    resp = client.rpc(
+        "create_portal_session",
+        {"p_user_id": user_id},
+    ).execute()
+    return resp.data
+
+
+def validate_session(
+    client: Any, token: str,
+) -> dict[str, Any] | None:
+    """Validate a session token. Returns user dict or None."""
+    resp = client.rpc(
+        "validate_portal_session",
+        {"p_token": token},
+    ).execute()
+    rows = resp.data or []
+    return rows[0] if rows else None
+
+
+def delete_session(client: Any, token: str) -> None:
+    """Delete a session (logout)."""
+    client.rpc(
+        "delete_portal_session",
+        {"p_token": token},
+    ).execute()

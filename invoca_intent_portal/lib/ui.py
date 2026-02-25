@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import html as _html
+
 import plotly.graph_objects as go
 import streamlit as st
 
@@ -248,3 +250,32 @@ def apply_chart_defaults(fig: go.Figure) -> go.Figure:
         **PLOTLY_TEMPLATE,
     )
     return fig
+
+
+# ── Shared detail-panel helpers ──────────────────────────────────────────
+
+FLAG_STYLES: dict[str, tuple[str, str]] = {
+    "compliance_concern": ("background:#7f1d1d;color:#fca5a5;", "Compliance Concern"),
+    "training_opportunity": ("background:#78350f;color:#fbbf24;", "Training Opportunity"),
+    "exceptional_handling": ("background:#064e3b;color:#6ee7b7;", "Exceptional Handling"),
+}
+
+
+def val(obj: object) -> str:
+    """Safe value display with 'n/a' fallback."""
+    if obj is None:
+        return "n/a"
+    text = str(obj).strip()
+    return text if text else "n/a"
+
+
+def section_divider(label: str) -> None:
+    """Render a styled section divider with label."""
+    st.markdown(
+        f'<div style="margin:1.5rem 0 0.8rem 0;padding-bottom:0.4rem;'
+        f'border-bottom:1px solid {COLORS["border"]};'
+        f'font-size:0.75rem;font-weight:600;letter-spacing:0.08em;'
+        f'text-transform:uppercase;color:{COLORS["text_muted"]};">'
+        f'{_html.escape(label)}</div>',
+        unsafe_allow_html=True,
+    )
