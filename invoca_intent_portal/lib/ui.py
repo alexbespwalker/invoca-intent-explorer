@@ -85,42 +85,49 @@ def apply_base_styles() -> None:
 
         /* ── KPI metric cards ─────────────────────────── */
         div[data-testid="stMetric"] {
-            background: linear-gradient(135deg, #1e293b 0%, #273548 100%);
+            background: linear-gradient(145deg, #1a2740 0%, #1e293b 60%, #222f43 100%);
             border: 1px solid #334155;
+            border-left: 3px solid #334155;
             border-radius: 14px;
-            padding: 1rem 1.1rem;
-            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+            padding: 1.1rem 1.2rem 1rem;
+            transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.15s ease;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.03);
         }
         div[data-testid="stMetric"]:hover {
-            border-color: #22d3ee;
-            box-shadow: 0 0 20px rgba(34, 211, 238, 0.08);
+            border-color: #475569;
+            border-left-color: #22d3ee;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.3), 0 0 24px rgba(34,211,238,0.06);
+            transform: translateY(-1px);
         }
         div[data-testid="stMetric"] label,
         div[data-testid="stMetric"] [data-testid="stMetricLabel"],
         div[data-testid="stMetric"] [data-testid="stMetricLabel"] p,
         div[data-testid="stMetric"] [data-testid="stMetricLabel"] div {
-            color: #94a3b8 !important;
-            font-size: 0.78rem !important;
-            font-weight: 500 !important;
-            letter-spacing: 0.04em !important;
+            color: #8b9db8 !important;
+            font-size: 0.72rem !important;
+            font-weight: 600 !important;
+            letter-spacing: 0.06em !important;
             text-transform: uppercase !important;
             opacity: 1 !important;
         }
         div[data-testid="stMetric"] [data-testid="stMetricValue"] {
             color: #f1f5f9 !important;
             font-weight: 700 !important;
-            font-size: 1.4rem !important;
+            font-size: 1.6rem !important;
             font-family: 'DM Sans', sans-serif !important;
             white-space: nowrap !important;
             overflow: hidden !important;
             text-overflow: ellipsis !important;
+            line-height: 1.3 !important;
         }
 
         /* ── Data table ───────────────────────────────── */
         div[data-testid="stDataFrame"] {
-            border: 1px solid #334155;
+            border: 1px solid #2d3b50;
             border-radius: 12px;
             overflow: hidden;
+            background: linear-gradient(180deg, #1a2740 0%, #1e293b 100%);
+            box-shadow: 0 1px 4px rgba(0,0,0,0.15);
         }
 
         /* ── Sidebar styling ──────────────────────────── */
@@ -135,16 +142,6 @@ def apply_base_styles() -> None:
             margin-bottom: 0.5rem !important;
             font-weight: 600 !important;
         }
-        /* Sidebar navigation page links */
-        section[data-testid="stSidebar"] [data-testid="stSidebarNavItems"] a {
-            font-size: 0.9rem !important;
-            font-weight: 500 !important;
-        }
-        section[data-testid="stSidebar"] [data-testid="stSidebarNavItems"] a[aria-current="page"] {
-            color: #22d3ee !important;
-            font-weight: 600 !important;
-        }
-
         /* ── Buttons ──────────────────────────────────── */
         button[kind="primary"] {
             border-radius: 10px !important;
@@ -177,14 +174,27 @@ def apply_base_styles() -> None:
 
         /* ── Plotly chart containers ──────────────────── */
         div[data-testid="stPlotlyChart"] {
-            border: 1px solid #334155;
+            border: 1px solid #2d3b50;
             border-radius: 12px;
-            padding: 0.5rem;
-            background: #1e293b;
-            transition: border-color 0.2s ease;
+            padding: 0.6rem 0.6rem 0.3rem;
+            background: linear-gradient(180deg, #1a2740 0%, #1e293b 100%);
+            transition: border-color 0.25s ease, box-shadow 0.25s ease;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.15);
         }
         div[data-testid="stPlotlyChart"]:hover {
-            border-color: #475569;
+            border-color: #3d4f69;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+        }
+
+        /* ── Chart section titles ────────────────────── */
+        .chart-title {
+            font-size: 0.78rem;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            color: #8b9db8;
+            margin: 1rem 0 0.4rem 0;
+            padding-left: 2px;
         }
 
         /* ── Metric delta (green arrow + pct) ─────────── */
@@ -205,6 +215,94 @@ def apply_base_styles() -> None:
             font-size: 0.82rem !important;
             font-weight: 500 !important;
             color: #94a3b8 !important;
+        }
+
+        /* ── Login card ──────────────────────────────── */
+        .login-card {
+            background: linear-gradient(145deg, #1a2740 0%, #1e293b 60%, #1a2740 100%);
+            border: 1px solid #2d3b50;
+            border-radius: 16px;
+            padding: 2rem 2rem 1.5rem;
+            margin-top: 1rem;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.3), 0 0 40px rgba(34,211,238,0.03);
+        }
+        .login-card-header {
+            font-size: 0.68rem;
+            font-weight: 600;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: #64748b;
+            margin-bottom: 1.2rem;
+            text-align: center;
+        }
+
+        /* ── Text input refinement (login + filters) ── */
+        div[data-testid="stTextInput"] input {
+            background: #0f172a !important;
+            border: 1px solid #2d3b50 !important;
+            border-radius: 10px !important;
+            color: #e2e8f0 !important;
+            font-size: 0.9rem !important;
+            padding: 0.6rem 0.8rem !important;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+        }
+        div[data-testid="stTextInput"] input:focus {
+            border-color: #22d3ee !important;
+            box-shadow: 0 0 0 2px rgba(34,211,238,0.12) !important;
+        }
+        div[data-testid="stTextInput"] input::placeholder {
+            color: #475569 !important;
+        }
+        div[data-testid="stTextInput"] label {
+            font-size: 0.78rem !important;
+            font-weight: 500 !important;
+            color: #8b9db8 !important;
+            letter-spacing: 0.02em !important;
+        }
+
+        /* ── Primary button refinement ───────────────── */
+        button[kind="primary"] {
+            background: linear-gradient(135deg, #0891b2 0%, #22d3ee 100%) !important;
+            border: none !important;
+            border-radius: 10px !important;
+            color: #0f172a !important;
+            font-weight: 600 !important;
+            letter-spacing: 0.02em !important;
+            transition: box-shadow 0.2s ease, transform 0.1s ease !important;
+        }
+        button[kind="primary"]:hover {
+            box-shadow: 0 4px 16px rgba(34,211,238,0.25) !important;
+            transform: translateY(-1px) !important;
+        }
+        button[kind="primary"]:active {
+            transform: translateY(0) !important;
+        }
+
+        /* ── Transcript code block ─────────────────────── */
+        div[data-testid='stCode'] {
+            border: 1px solid #334155;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        div[data-testid='stCode'] pre {
+            max-height: 420px;
+            overflow-y: auto;
+            background: #0f172a !important;
+            color: #cbd5e1 !important;
+            font-family: 'JetBrains Mono', monospace !important;
+            font-size: 0.82rem !important;
+            line-height: 1.7 !important;
+            padding: 1rem 1.2rem !important;
+        }
+        div[data-testid='stCode'] pre::-webkit-scrollbar {
+            width: 6px;
+        }
+        div[data-testid='stCode'] pre::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        div[data-testid='stCode'] pre::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 3px;
         }
         </style>
         """,
@@ -267,6 +365,14 @@ def val(obj: object) -> str:
         return "n/a"
     text = str(obj).strip()
     return text if text else "n/a"
+
+
+def chart_title(label: str) -> None:
+    """Render a styled chart section title."""
+    st.markdown(
+        f'<div class="chart-title">{_html.escape(label)}</div>',
+        unsafe_allow_html=True,
+    )
 
 
 def section_divider(label: str) -> None:

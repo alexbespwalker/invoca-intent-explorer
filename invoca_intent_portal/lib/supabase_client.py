@@ -66,26 +66,13 @@ def require_supabase_client() -> Client:
     Validates config BEFORE calling the cached ``get_supabase_client()``
     so a ``StopException`` is never cached inside ``@st.cache_resource``.
     """
-    url = (
-        os.getenv("SUPABASE_URL")
-        or _secret_nested("database", "url")
-        or _secret_flat("SUPABASE_URL")
-    )
-    key = (
-        os.getenv("SUPABASE_SERVICE_KEY")
-        or os.getenv("SUPABASE_KEY")
-        or _secret_nested("database", "key")
-        or _secret_flat("SUPABASE_SERVICE_KEY")
-        or _secret_flat("SUPABASE_KEY")
-    )
-    if not url or not key:
-        st.error(
-            "Database not configured. Add [database] section with url/key "
-            "to app secrets (or set SUPABASE_URL + SUPABASE_KEY)."
-        )
+    try:
+        get_supabase_config()
+    except RuntimeError:
+        st.error("Database not configured. Add [database] url/key to app secrets.")
         st.stop()
     try:
         return get_supabase_client()
-    except Exception as e:
-        st.error(f"Could not connect to database: {e}")
+    except Exception:
+        st.error("Could not connect to database. Check your configuration.")
         st.stop()

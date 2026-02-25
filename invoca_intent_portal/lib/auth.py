@@ -22,9 +22,7 @@ def check_password() -> bool:
     Flow:
     1. session_state["authenticated"] — same-tab fast path
     2. query_params["_session"] — cross-refresh persistence via DB
-    3. Legacy st.secrets["auth"]["password"] — transition fallback
-    4. Login form — email + password
-    5. No [database] config — open access (local dev)
+    3. Login form — email + password
     """
     # 1. Already authenticated this tab
     if st.session_state.get("authenticated"):
@@ -34,8 +32,9 @@ def check_password() -> bool:
     try:
         get_supabase_config()
     except RuntimeError:
-        # No DB config — open access for local dev
-        return True
+        st.error("Authentication unavailable. Check database configuration.")
+        st.stop()
+        return False
 
     client = _get_client()
 
@@ -53,23 +52,29 @@ def check_password() -> bool:
             # Expired/invalid token — clear it
             del st.query_params["_session"]
 
-    # 3. Legacy password fallback (transition period)
-    try:
-        legacy_pw = st.secrets["auth"]["password"]
-    except (KeyError, FileNotFoundError):
-        legacy_pw = None
-
-    # 4. Show login form
+    # 3. Show login form
     st.markdown(
-        '<div style="height:3px;background:linear-gradient(90deg,#22d3ee 0%,#a78bfa 50%,#f59e0b 100%);'
-        'border-radius:2px;margin-bottom:1rem;"></div>',
+        '<div style="height:2px;background:linear-gradient(90deg,#22d3ee 0%,#0ea5e9 40%,#a78bfa 70%,#f59e0b 100%);'
+        'border-radius:2px;margin-bottom:1.2rem;opacity:0.85;"></div>',
         unsafe_allow_html=True,
     )
     st.title("Invoca Intent Explorer")
-    st.caption("Sign in with your Walker Advertising email.")
 
     _, center, _ = st.columns([1, 1.2, 1])
     with center:
+        st.markdown(
+            '<div class="login-card">'
+            '<div class="login-card-header">Walker Advertising</div>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+        # The card div above is cosmetic context; Streamlit inputs render below
+        # so we keep them outside the raw HTML to maintain widget functionality
+        st.markdown(
+            '<div style="font-size:0.82rem;color:#64748b;text-align:center;'
+            'margin:-0.5rem 0 1rem 0;">Sign in with your company email</div>',
+            unsafe_allow_html=True,
+        )
         email = st.text_input(
             "Email", key="login_email",
             placeholder="you@walkeradvertising.com",
@@ -91,12 +96,6 @@ def check_password() -> bool:
                     st.session_state["user_display_name"] = user.get("user_display_name") or user["user_email"]
                     st.session_state["session_token"] = token
                     st.query_params["_session"] = token
-                    st.rerun()
-                elif legacy_pw and password == legacy_pw:
-                    # Legacy password match — no DB session, just in-memory
-                    st.session_state["authenticated"] = True
-                    st.session_state["user_email"] = email.strip()
-                    st.session_state["user_display_name"] = email.strip()
                     st.rerun()
                 else:
                     st.error("Invalid email or password.")

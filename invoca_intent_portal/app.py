@@ -22,14 +22,14 @@ from invoca_intent_portal.lib.auth import check_password, logout
 from invoca_intent_portal.lib.supabase_client import require_supabase_client
 from invoca_intent_portal.lib.db import get_analyzed_calls, get_brands, get_call_detail
 from invoca_intent_portal.lib.ui import (
-    apply_base_styles, apply_chart_defaults, CHART_COLORS, COLORS,
+    apply_base_styles, apply_chart_defaults, chart_title, CHART_COLORS, COLORS,
     section_divider, FLAG_STYLES, val,
 )
 
 
-def _fmt(val: str) -> str:
+def _fmt(s: str) -> str:
     """Format snake_case DB values into readable labels."""
-    return val.replace("_", " ").title() if val else val
+    return s.replace("_", " ").title() if s else s
 
 st.set_page_config(
     page_title="Invoca Intent Explorer",
@@ -40,8 +40,8 @@ apply_base_styles()
 check_password()
 
 st.markdown(
-    '<div style="height:3px;background:linear-gradient(90deg,#22d3ee 0%,#a78bfa 50%,#f59e0b 100%);'
-    'border-radius:2px;margin-bottom:1rem;"></div>',
+    '<div style="height:2px;background:linear-gradient(90deg,#22d3ee 0%,#0ea5e9 40%,#a78bfa 70%,#f59e0b 100%);'
+    'border-radius:2px;margin-bottom:1.2rem;opacity:0.85;"></div>',
     unsafe_allow_html=True,
 )
 st.title("Invoca Intent Explorer")
@@ -126,8 +126,8 @@ try:
             brand_code=brand_filter,
             limit=5000,
         )
-except Exception as e:
-    st.error(f"Error loading data: {e}")
+except Exception:
+    st.error("Error loading data. Please try again or check your filters.")
     st.stop()
 
 if calls_df.empty:
@@ -182,7 +182,7 @@ m5.metric("Repo Success", repo_success_rate)
 chart_col_1, chart_col_2 = st.columns(2)
 
 with chart_col_1:
-    st.subheader("Intent Distribution")
+    chart_title("Intent Distribution")
     if analyzed_count > 0:
         pie_data = (
             calls_df.loc[analyzed_mask, "caller_intent"]
@@ -207,7 +207,7 @@ with chart_col_1:
         st.info("No analyzed calls in current window.")
 
 with chart_col_2:
-    st.subheader("Outcome Breakdown")
+    chart_title("Outcome Breakdown")
     if "call_outcome" in calls_df.columns and calls_df["call_outcome"].notna().any():
         out_data = (
             calls_df["call_outcome"]
@@ -232,7 +232,7 @@ with chart_col_2:
 row2_col1, row2_col2 = st.columns(2)
 
 with row2_col1:
-    st.subheader("Case Type Distribution")
+    chart_title("Case Type Distribution")
     if "case_type" in calls_df.columns and calls_df["case_type"].notna().any():
         case_data = (
             calls_df["case_type"]
@@ -254,7 +254,7 @@ with row2_col1:
         st.info("No case type data in current window.")
 
 with row2_col2:
-    st.subheader("Daily Intent Trend")
+    chart_title("Daily Intent Trend")
     if analyzed_count > 0:
         trend_base = calls_df.loc[analyzed_mask].copy()
         trend_base["call_date"] = pd.to_datetime(
@@ -277,7 +277,7 @@ with row2_col2:
         st.info("No analyzed data for trend chart.")
 
 # ── Call table ───────────────────────────────────────────────────────────
-st.subheader("Call Table")
+chart_title("Call Table")
 st.caption("Select a row to preview its transcript below.")
 
 # Extract first key quote as intent quote
@@ -338,48 +338,51 @@ if selection.selection.rows:
 
     call_detail, analyses = get_call_detail(client, selected_call_id)
 
-    # Gradient divider
+    # Strong gradient divider + spacing
     st.markdown(
-        '<div style="height:2px;margin:1.5rem 0 1rem 0;'
-        'background:linear-gradient(90deg,#22d3ee 0%,#a78bfa 50%,#f59e0b 100%);'
-        'border-radius:1px;opacity:0.5;"></div>',
+        '<div style="height:2px;margin:2rem 0 1.2rem 0;'
+        'background:linear-gradient(90deg,#22d3ee 0%,#0ea5e9 35%,#a78bfa 65%,#f59e0b 100%);'
+        'border-radius:1px;opacity:0.7;"></div>',
         unsafe_allow_html=True,
     )
 
     if call_detail:
-        # Section label
+        # Section label with dot indicator
         st.markdown(
-            '<div style="font-size:0.72rem;font-weight:600;letter-spacing:0.1em;'
-            'text-transform:uppercase;color:#64748b;margin-bottom:0.5rem;">'
-            'Call Detail</div>',
+            '<div style="display:flex;align-items:center;gap:6px;margin-bottom:0.6rem;">'
+            '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;'
+            'background:#22d3ee;"></span>'
+            '<span style="font-size:0.72rem;font-weight:600;letter-spacing:0.1em;'
+            'text-transform:uppercase;color:#64748b;">Call Detail</span></div>',
             unsafe_allow_html=True,
         )
 
-        # Metadata header bar
+        # Metadata header bar -- CSS grid for consistent spacing
         call_label = _html.escape(str(selected_row.get("Call ID", selected_call_id)))
         call_date = _html.escape(str(selected_row.get("Date", "")))
         call_intent = _html.escape(str(selected_row.get("Intent", "")))
         call_dur = _html.escape(str(selected_row.get("Duration (s)", "")))
 
         st.markdown(
-            f'<div style="display:flex;gap:2rem;align-items:center;'
-            f'background:linear-gradient(135deg,#1e293b 0%,#273548 100%);'
-            f'border:1px solid #334155;border-radius:12px;'
-            f'padding:0.8rem 1.2rem;margin-bottom:0.8rem;">'
-            f'<div><span style="font-size:0.7rem;font-weight:600;letter-spacing:0.06em;'
-            f'text-transform:uppercase;color:#64748b;">Call ID</span><br>'
+            f'<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;'
+            f'background:linear-gradient(145deg,#1a2740 0%,#1e293b 60%,#222f43 100%);'
+            f'border:1px solid #2d3b50;border-radius:12px;'
+            f'padding:1rem 1.4rem;margin-bottom:1rem;'
+            f'box-shadow:0 2px 8px rgba(0,0,0,0.2);">'
+            f'<div><span style="font-size:0.68rem;font-weight:600;letter-spacing:0.06em;'
+            f'text-transform:uppercase;color:#64748b;display:block;margin-bottom:4px;">Call ID</span>'
             f'<span style="font-family:\'JetBrains Mono\',monospace;font-size:0.88rem;'
             f'color:#22d3ee;">{call_label}</span></div>'
-            f'<div><span style="font-size:0.7rem;font-weight:600;letter-spacing:0.06em;'
-            f'text-transform:uppercase;color:#64748b;">Date</span><br>'
+            f'<div><span style="font-size:0.68rem;font-weight:600;letter-spacing:0.06em;'
+            f'text-transform:uppercase;color:#64748b;display:block;margin-bottom:4px;">Date</span>'
             f'<span style="font-size:0.88rem;color:#e2e8f0;">{call_date}</span></div>'
-            f'<div><span style="font-size:0.7rem;font-weight:600;letter-spacing:0.06em;'
-            f'text-transform:uppercase;color:#64748b;">Intent</span><br>'
-            f'<span style="display:inline-block;margin-top:2px;padding:1px 8px;'
-            f'background:#164e6380;border-radius:5px;font-size:0.84rem;'
+            f'<div><span style="font-size:0.68rem;font-weight:600;letter-spacing:0.06em;'
+            f'text-transform:uppercase;color:#64748b;display:block;margin-bottom:4px;">Intent</span>'
+            f'<span style="display:inline-block;padding:2px 10px;'
+            f'background:#164e6350;border:1px solid #164e6380;border-radius:6px;font-size:0.84rem;'
             f'color:#22d3ee;">{call_intent}</span></div>'
-            f'<div><span style="font-size:0.7rem;font-weight:600;letter-spacing:0.06em;'
-            f'text-transform:uppercase;color:#64748b;">Duration</span><br>'
+            f'<div><span style="font-size:0.68rem;font-weight:600;letter-spacing:0.06em;'
+            f'text-transform:uppercase;color:#64748b;display:block;margin-bottom:4px;">Duration</span>'
             f'<span style="font-size:0.88rem;color:#e2e8f0;">{call_dur}s</span></div>'
             f'</div>',
             unsafe_allow_html=True,
@@ -387,29 +390,36 @@ if selection.selection.rows:
 
         # Metadata grid (Date/Start/Duration | Advertiser/Campaign/WordCount)
         _meta_col1, _meta_col2 = st.columns(2)
+        _meta_grid_style = (
+            f'display:grid;grid-template-columns:auto 1fr;gap:0.45rem 1.2rem;'
+            f'font-size:0.85rem;padding:0.6rem 0;'
+        )
+        _meta_label_style = (
+            f'color:{COLORS["text_muted"]};font-size:0.76rem;font-weight:500;'
+            f'letter-spacing:0.03em;align-self:center;'
+        )
+        _meta_value_style = f'color:{COLORS["text_primary"]};align-self:center;'
         with _meta_col1:
             st.markdown(
-                f'<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.3rem 1.5rem;'
-                f'font-size:0.88rem;color:{COLORS["text_secondary"]};">'
-                f'<span style="color:{COLORS["text_muted"]};">Date (PT)</span>'
-                f'<span style="color:{COLORS["text_primary"]};">{_html.escape(val(call_detail.get("call_date_pt")))}</span>'
-                f'<span style="color:{COLORS["text_muted"]};">Call Start</span>'
-                f'<span style="color:{COLORS["text_primary"]};">{_html.escape(val(call_detail.get("call_start_time")))}</span>'
-                f'<span style="color:{COLORS["text_muted"]};">Duration</span>'
-                f'<span style="color:{COLORS["text_primary"]};">{_html.escape(val(call_detail.get("duration_seconds")))} sec</span>'
+                f'<div style="{_meta_grid_style}">'
+                f'<span style="{_meta_label_style}">Date (PT)</span>'
+                f'<span style="{_meta_value_style}">{_html.escape(val(call_detail.get("call_date_pt")))}</span>'
+                f'<span style="{_meta_label_style}">Call Start</span>'
+                f'<span style="{_meta_value_style}">{_html.escape(val(call_detail.get("call_start_time")))}</span>'
+                f'<span style="{_meta_label_style}">Duration</span>'
+                f'<span style="{_meta_value_style}">{_html.escape(val(call_detail.get("duration_seconds")))} sec</span>'
                 f'</div>',
                 unsafe_allow_html=True,
             )
         with _meta_col2:
             st.markdown(
-                f'<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.3rem 1.5rem;'
-                f'font-size:0.88rem;color:{COLORS["text_secondary"]};">'
-                f'<span style="color:{COLORS["text_muted"]};">Advertiser</span>'
-                f'<span style="color:{COLORS["text_primary"]};">{_html.escape(val(call_detail.get("advertiser_name")))}</span>'
-                f'<span style="color:{COLORS["text_muted"]};">Campaign</span>'
-                f'<span style="color:{COLORS["text_primary"]};">{_html.escape(val(call_detail.get("campaign_name")))}</span>'
-                f'<span style="color:{COLORS["text_muted"]};">Word Count</span>'
-                f'<span style="color:{COLORS["text_primary"]};">{_html.escape(val(call_detail.get("transcript_word_count")))}</span>'
+                f'<div style="{_meta_grid_style}">'
+                f'<span style="{_meta_label_style}">Advertiser</span>'
+                f'<span style="{_meta_value_style}">{_html.escape(val(call_detail.get("advertiser_name")))}</span>'
+                f'<span style="{_meta_label_style}">Campaign</span>'
+                f'<span style="{_meta_value_style}">{_html.escape(val(call_detail.get("campaign_name")))}</span>'
+                f'<span style="{_meta_label_style}">Word Count</span>'
+                f'<span style="{_meta_value_style}">{_html.escape(val(call_detail.get("transcript_word_count")))}</span>'
                 f'</div>',
                 unsafe_allow_html=True,
             )
@@ -423,36 +433,6 @@ if selection.selection.rows:
                 f'<div style="font-size:0.75rem;color:#64748b;margin-bottom:0.4rem;'
                 f'font-family:\'JetBrains Mono\',monospace;">'
                 f'{_word_count:,} words</div>',
-                unsafe_allow_html=True,
-            )
-            st.markdown(
-                "<style>"
-                "div[data-testid='stCode'] {"
-                "  border: 1px solid #334155;"
-                "  border-radius: 10px;"
-                "  overflow: hidden;"
-                "}"
-                "div[data-testid='stCode'] pre {"
-                "  max-height: 420px;"
-                "  overflow-y: auto;"
-                "  background: #0f172a !important;"
-                "  color: #cbd5e1 !important;"
-                "  font-family: 'JetBrains Mono', monospace !important;"
-                "  font-size: 0.82rem !important;"
-                "  line-height: 1.7 !important;"
-                "  padding: 1rem 1.2rem !important;"
-                "}"
-                "div[data-testid='stCode'] pre::-webkit-scrollbar {"
-                "  width: 6px;"
-                "}"
-                "div[data-testid='stCode'] pre::-webkit-scrollbar-track {"
-                "  background: #1e293b;"
-                "}"
-                "div[data-testid='stCode'] pre::-webkit-scrollbar-thumb {"
-                "  background: #475569;"
-                "  border-radius: 3px;"
-                "}"
-                "</style>",
                 unsafe_allow_html=True,
             )
             st.code(_transcript_text, language=None, wrap_lines=True)
@@ -474,38 +454,57 @@ if selection.selection.rows:
             a5.metric("Case Type", _fmt(val(latest.get("case_type"))))
 
             # Detail chips (brand confusion, sentiment, validation)
+            _chip_base = (
+                'display:inline-flex;align-items:center;gap:5px;'
+                'padding:4px 12px;border-radius:8px;font-size:0.8em;font-weight:500;'
+                'letter-spacing:0.01em;'
+            )
             detail_items = []
             brand_confused = latest.get("brand_confusion")
             if brand_confused:
                 detail_items.append(
-                    '<span style="background:#7f1d1d;color:#fca5a5;padding:3px 10px;'
-                    'border-radius:6px;font-size:0.82em;">Brand Confused</span>'
+                    f'<span style="{_chip_base}'
+                    f'background:rgba(127,29,29,0.5);color:#fca5a5;'
+                    f'border:1px solid rgba(252,165,165,0.2);">'
+                    f'<span style="display:inline-block;width:5px;height:5px;'
+                    f'border-radius:50%;background:#fca5a5;"></span>'
+                    f'Brand Confused</span>'
                 )
             else:
                 detail_items.append(
-                    f'<span style="background:{COLORS["bg_elevated"]};color:{COLORS["text_muted"]};'
-                    f'padding:3px 10px;border-radius:6px;font-size:0.82em;">No Brand Confusion</span>'
+                    f'<span style="{_chip_base}'
+                    f'background:{COLORS["bg_elevated"]};color:{COLORS["text_muted"]};'
+                    f'border:1px solid #334155;">No Brand Confusion</span>'
                 )
 
             sentiment = val(latest.get("caller_sentiment"))
-            sent_color = {"positive": "#34d399", "negative": "#fb7185", "neutral": "#94a3b8"}.get(
-                sentiment.lower(), COLORS["text_secondary"]
+            sent_color_map = {
+                "positive": ("#34d399", "rgba(52,211,153,0.15)", "rgba(52,211,153,0.25)"),
+                "negative": ("#fb7185", "rgba(251,113,133,0.15)", "rgba(251,113,133,0.25)"),
+                "neutral": ("#94a3b8", "rgba(148,163,184,0.1)", "rgba(148,163,184,0.2)"),
+            }
+            sent_text, sent_bg, sent_border = sent_color_map.get(
+                sentiment.lower(),
+                (COLORS["text_secondary"], COLORS["bg_elevated"], "#334155"),
             )
             detail_items.append(
-                f'<span style="background:{COLORS["bg_elevated"]};color:{sent_color};'
-                f'padding:3px 10px;border-radius:6px;font-size:0.82em;">'
+                f'<span style="{_chip_base}'
+                f'background:{sent_bg};color:{sent_text};'
+                f'border:1px solid {sent_border};">'
                 f'Sentiment: {_html.escape(_fmt(sentiment))}</span>'
             )
 
             validation = latest.get("validation_passed")
             if validation:
                 detail_items.append(
-                    '<span style="background:#064e3b;color:#6ee7b7;padding:3px 10px;'
-                    'border-radius:6px;font-size:0.82em;">Validated</span>'
+                    f'<span style="{_chip_base}'
+                    f'background:rgba(6,78,59,0.5);color:#6ee7b7;'
+                    f'border:1px solid rgba(110,231,183,0.2);">'
+                    f'Validated</span>'
                 )
 
             st.markdown(
-                f'<div style="display:flex;gap:8px;flex-wrap:wrap;margin:0.5rem 0 1rem 0;">'
+                f'<div style="display:flex;gap:8px;flex-wrap:wrap;margin:0.6rem 0 1.2rem 0;">'
                 f'{"".join(detail_items)}</div>',
                 unsafe_allow_html=True,
             )
@@ -546,7 +545,7 @@ if selection.selection.rows:
                 flag_html = " ".join(
                     f'<span style="{FLAG_STYLES.get(f, (_default_style,))[0]}'
                     f'padding:3px 10px;border-radius:6px;font-size:0.82em;font-weight:500;">'
-                    f'{FLAG_STYLES.get(f, (None, _fmt(f)))[1]}</span>'
+                    f'{_html.escape(FLAG_STYLES.get(f, (None, _fmt(f)))[1])}</span>'
                     for f in flags
                 )
                 st.markdown(
@@ -562,9 +561,12 @@ if selection.selection.rows:
                 section_divider("Confusion Signals")
                 for sig in signals:
                     st.markdown(
-                        f'<div style="padding:0.4rem 0.8rem;margin:0.3rem 0;'
+                        f'<div style="padding:0.5rem 0.9rem;margin:0.4rem 0;'
                         f'border-left:3px solid {COLORS["rose"]};'
-                        f'color:{COLORS["text_secondary"]};font-size:0.88rem;">'
+                        f'background:rgba(251,113,133,0.06);'
+                        f'border-radius:0 8px 8px 0;'
+                        f'color:{COLORS["text_secondary"]};font-size:0.86rem;'
+                        f'line-height:1.5;">'
                         f'{_html.escape(str(sig))}</div>',
                         unsafe_allow_html=True,
                     )
@@ -573,27 +575,27 @@ if selection.selection.rows:
             quotes = latest.get("key_quotes")
             if quotes and isinstance(quotes, list) and len(quotes) > 0:
                 section_divider("Key Quotes")
+                _quote_style = (
+                    f'padding:0.7rem 1.1rem;margin:0.5rem 0;'
+                    f'border-left:3px solid {COLORS["accent"]};'
+                    f'background:linear-gradient(135deg,{COLORS["bg_elevated"]} 0%,#1e293b 100%);'
+                    f'border:1px solid #2d3b50;border-left:3px solid {COLORS["accent"]};'
+                    f'border-radius:0 10px 10px 0;'
+                    f'font-style:italic;color:{COLORS["text_primary"]};font-size:0.88rem;'
+                    f'line-height:1.6;'
+                )
                 for q in quotes:
-                    if isinstance(q, dict):
-                        quote_text = _html.escape(q.get("quote", ""))
+                    text, ctx = (q.get("quote", ""), q.get("context")) if isinstance(q, dict) else (str(q), None)
+                    st.markdown(
+                        f'<div style="{_quote_style}">'
+                        f'&ldquo;{_html.escape(text)}&rdquo;</div>',
+                        unsafe_allow_html=True,
+                    )
+                    if ctx:
                         st.markdown(
-                            f'<div style="padding:0.6rem 1rem;margin:0.5rem 0;'
-                            f'border-left:3px solid {COLORS["accent"]};'
-                            f'background:{COLORS["bg_elevated"]};border-radius:0 8px 8px 0;'
-                            f'font-style:italic;color:{COLORS["text_primary"]};font-size:0.88rem;">'
-                            f'&ldquo;{quote_text}&rdquo;</div>',
-                            unsafe_allow_html=True,
-                        )
-                        ctx = q.get("context")
-                        if ctx:
-                            st.caption(ctx)
-                    elif isinstance(q, str):
-                        st.markdown(
-                            f'<div style="padding:0.6rem 1rem;margin:0.5rem 0;'
-                            f'border-left:3px solid {COLORS["accent"]};'
-                            f'background:{COLORS["bg_elevated"]};border-radius:0 8px 8px 0;'
-                            f'font-style:italic;color:{COLORS["text_primary"]};font-size:0.88rem;">'
-                            f'&ldquo;{_html.escape(q)}&rdquo;</div>',
+                            f'<div style="font-size:0.76rem;color:{COLORS["text_muted"]};'
+                            f'margin:-0.2rem 0 0.4rem 1.2rem;font-style:normal;">'
+                            f'{_html.escape(str(ctx))}</div>',
                             unsafe_allow_html=True,
                         )
 
