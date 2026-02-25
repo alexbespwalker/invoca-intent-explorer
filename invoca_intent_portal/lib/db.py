@@ -54,7 +54,9 @@ def get_analyzed_calls(
         .select(
             "call_id,analyzed_at,caller_intent,intent_confidence,brand_confusion,"
             "confusion_signals,call_outcome,agent_quality_score,caller_sentiment,"
-            "key_quotes,validation_passed"
+            "key_quotes,validation_passed,"
+            "case_type,agent_repositioning_attempted,agent_repositioning_successful,"
+            "repositioning_technique,flags"
         )
         .in_("call_id", call_ids)
         .order("analyzed_at", desc=True)
