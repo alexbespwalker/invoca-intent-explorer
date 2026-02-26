@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html as _html
+import json
 from typing import Any
 
 import plotly.graph_objects as go
@@ -129,7 +130,6 @@ def apply_base_styles() -> None:
         }
         div[data-testid="stMetric"]:hover {
             border-color: #475569;
-            border-left-color: #22d3ee;
             box-shadow: 0 4px 16px rgba(0,0,0,0.3), 0 0 24px rgba(34,211,238,0.06);
             transform: translateY(-1px);
         }
@@ -183,8 +183,24 @@ def apply_base_styles() -> None:
 
         /* ── Expanders ────────────────────────────────── */
         details {
-            border: 1px solid #334155 !important;
-            border-radius: 10px !important;
+            border: 1px solid #2d3b50 !important;
+            border-radius: 0 0 12px 12px !important;
+            margin-top: -0.5rem !important;
+            background: linear-gradient(180deg, #1a2740 0%, #1e293b 100%) !important;
+        }
+        details summary {
+            font-size: 0.82rem !important;
+            font-weight: 500 !important;
+            color: #94a3b8 !important;
+            padding: 0.5rem 1rem !important;
+        }
+        details[open] {
+            border-color: #3d4f69 !important;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.2) !important;
+        }
+        details[open] summary {
+            border-bottom: 1px solid #2d3b50 !important;
+            margin-bottom: 0.4rem !important;
         }
 
         /* ── Text areas ───────────────────────────────── */
@@ -210,25 +226,25 @@ def apply_base_styles() -> None:
         div[data-testid="stPlotlyChart"] {
             border: 1px solid #2d3b50;
             border-radius: 12px;
-            padding: 0.6rem 0.6rem 0.3rem;
-            background: linear-gradient(180deg, #1a2740 0%, #1e293b 100%);
-            transition: border-color 0.25s ease, box-shadow 0.25s ease;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+            padding: 0.8rem 0.8rem 0.4rem;
+            background: linear-gradient(145deg, #1a2740 0%, #1e293b 60%, #1a2740 100%);
+            transition: border-color 0.3s ease, box-shadow 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.02);
         }
         div[data-testid="stPlotlyChart"]:hover {
             border-color: #3d4f69;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.02);
         }
 
         /* ── Chart section titles ────────────────────── */
         .chart-title {
-            font-size: 0.78rem;
+            font-size: 0.74rem;
             font-weight: 600;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.06em;
             text-transform: uppercase;
             color: #8b9db8;
-            margin: 1rem 0 0.4rem 0;
-            padding-left: 2px;
+            margin: 1.2rem 0 0.25rem 0;
+            padding-left: 4px;
         }
 
         /* ── Metric delta (green arrow + pct) ─────────── */
@@ -312,6 +328,22 @@ def apply_base_styles() -> None:
             transform: translateY(0) !important;
         }
 
+        /* ── Secondary button refinement ──────────────── */
+        button[kind="secondary"] {
+            background: #1e293b !important;
+            border: 1px solid #334155 !important;
+            border-radius: 10px !important;
+            color: #94a3b8 !important;
+            font-weight: 500 !important;
+            letter-spacing: 0.02em !important;
+            transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease !important;
+        }
+        button[kind="secondary"]:hover {
+            border-color: #475569 !important;
+            color: #e2e8f0 !important;
+            background: #273548 !important;
+        }
+
         /* ── Transcript code block ─────────────────────── */
         div[data-testid='stCode'] {
             border: 1px solid #334155;
@@ -386,6 +418,27 @@ def apply_chart_defaults(fig: go.Figure) -> go.Figure:
 
 # ── Shared detail-panel helpers ──────────────────────────────────────────
 
+# ── Tier classification constants ────────────────────────────────────────
+VALID_INTENTS = {
+    "injury_new_case", "property_only", "already_represented",
+    "existing_case", "general_question",
+}
+
+TIER_COLORS = {
+    "Valid Inquiries": "#34d399",   # emerald
+    "Wrong / Noise":   "#fb7185",   # rose
+}
+
+# Readable labels for raw_analysis->who_they_thought_they_called
+WHO_LABELS: dict[str, str] = {
+    "insurance_company": "Insurance Company",
+    "specific_company": "Specific Company",
+    "claims_department": "Claims Dept",
+    "attorney_service": "Attorney Service",
+    "government_agency": "Government Agency",
+    "unclear": "Unclear",
+}
+
 FLAG_STYLES: dict[str, tuple[str, str]] = {
     "brand_confusion": ("background:#7f1d1d;color:#fca5a5;", "Brand Confusion"),
     "compliance_concern": ("background:#7f1d1d;color:#fca5a5;", "Compliance Concern"),
@@ -418,9 +471,9 @@ def chart_title(label: str) -> None:
 def section_divider(label: str) -> None:
     """Render a styled section divider with label."""
     st.markdown(
-        f'<div style="margin:1.5rem 0 0.8rem 0;padding-bottom:0.4rem;'
+        f'<div style="margin:1.2rem 0 0.6rem 0;padding-bottom:0.35rem;'
         f'border-bottom:1px solid {COLORS["border"]};'
-        f'font-size:0.75rem;font-weight:600;letter-spacing:0.08em;'
+        f'font-size:0.72rem;font-weight:600;letter-spacing:0.08em;'
         f'text-transform:uppercase;color:{COLORS["text_muted"]};">'
         f'{_html.escape(label)}</div>',
         unsafe_allow_html=True,
@@ -456,83 +509,63 @@ def sentiment_pill(sentiment: str) -> str:
     return badge_pill(_fmt(sentiment), tc, bg)
 
 
+def tier_section_divider(label: str, count: int, tier: str) -> None:
+    """Render a colored tier section header."""
+    color = TIER_COLORS.get(tier, COLORS["text_muted"])
+    st.markdown(
+        f'<div style="margin:1.6rem 0 0.7rem 0;padding:0.5rem 0.8rem 0.45rem;'
+        f'border-left:3px solid {color};'
+        f'background:linear-gradient(90deg,{color}0d 0%,transparent 70%);'
+        f'border-radius:0 6px 6px 0;'
+        f'font-size:0.82rem;font-weight:600;letter-spacing:0.08em;'
+        f'text-transform:uppercase;color:{color};">'
+        f'{_html.escape(label)}'
+        f'<span style="margin-left:8px;color:{COLORS["text_muted"]};font-weight:400;">'
+        f'({count})</span></div>',
+        unsafe_allow_html=True,
+    )
+
+
 def call_card(row: dict[str, Any], idx: int) -> None:
-    """Render a compact call summary card with expander for details."""
+    """Render a situation-dominant call summary card."""
     intent = str(row.get("caller_intent") or "other")
     situation = str(row.get("caller_situation") or "")
     outcome = str(row.get("call_outcome") or "other")
-    confidence = row.get("intent_confidence")
     date_val = str(row.get("call_date_pt") or "")
     duration = row.get("duration_seconds") or ""
-    sentiment = str(row.get("caller_sentiment") or "")
     brand_confused = row.get("brand_confusion", False)
-    quality = row.get("agent_quality_score")
-
-    # First key quote preview
-    quotes = row.get("key_quotes")
-    quote_preview = ""
-    if quotes and isinstance(quotes, list) and quotes:
-        q = quotes[0]
-        if isinstance(q, dict):
-            quote_preview = q.get("quote", "")
-        else:
-            quote_preview = str(q)
-    if len(quote_preview) > 120:
-        quote_preview = quote_preview[:117] + "..."
 
     # Truncate situation for card
-    situation_short = situation[:140] + "..." if len(situation) > 140 else situation
+    situation_short = situation[:200] + "..." if len(situation) > 200 else situation
 
-    # Confidence color
-    conf_str = str(confidence) if confidence is not None else "—"
-    conf_color = "#34d399" if confidence and confidence >= 80 else (
-        "#f59e0b" if confidence and confidence >= 60 else "#fb7185"
-    )
-
-    # Brand confusion indicator
-    bc_dot = (
-        f' <span style="display:inline-block;width:6px;height:6px;border-radius:50%;'
-        f'background:#fb7185;margin-left:4px;" title="Brand confusion"></span>'
-        if brand_confused else ""
-    )
+    # Confusion badge
+    bc_badge = ""
+    if brand_confused:
+        bc_badge = (
+            f' <span style="display:inline-flex;align-items:center;padding:2px 8px;'
+            f'border-radius:5px;font-size:0.72em;font-weight:500;'
+            f'background:rgba(251,113,133,0.15);color:#fb7185;'
+            f'border:1px solid #fb718533;">Confused</span>'
+        )
 
     card_html = (
         f'<div style="background:linear-gradient(145deg,#1a2740 0%,#1e293b 60%,#222f43 100%);'
-        f'border:1px solid #2d3b50;border-radius:12px;padding:0.8rem 1.1rem;'
-        f'margin-bottom:0.15rem;">'
-        # Row 1: intent pill + situation + date/duration
-        f'<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:0.35rem;">'
-        f'<div style="flex-shrink:0;">{intent_pill(intent)}{bc_dot}</div>'
-        f'<div style="flex:1;font-size:0.85rem;color:{COLORS["text_primary"]};line-height:1.4;">'
+        f'border:1px solid #2d3b50;border-radius:12px;padding:0.85rem 1.1rem;'
+        f'margin-bottom:0.5rem;">'
+        # Line 1: situation (dominant)
+        f'<div style="font-size:0.92rem;color:{COLORS["text_primary"]};line-height:1.45;'
+        f'margin-bottom:0.4rem;">'
         f'{_html.escape(situation_short)}</div>'
-        f'<div style="flex-shrink:0;text-align:right;font-size:0.75rem;color:{COLORS["text_muted"]};">'
-        f'{_html.escape(str(date_val))}<br>{_html.escape(str(duration))}s</div>'
+        # Line 2: intent pill + confusion badge + date · duration · outcome
+        f'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+        f'{intent_pill(intent)}{bc_badge}'
+        f'<span style="flex:1;"></span>'
+        f'<span style="font-size:0.76rem;color:{COLORS["text_secondary"]};font-variant-numeric:tabular-nums;">'
+        f'{_html.escape(str(date_val))}  \u00b7  {_html.escape(str(duration))}s</span>'
+        f'{outcome_pill(outcome)}'
+        f'</div>'
         f'</div>'
     )
-
-    # Row 2: quote preview + outcome + confidence
-    if quote_preview:
-        card_html += (
-            f'<div style="display:flex;align-items:center;gap:10px;">'
-            f'<div style="flex:1;font-size:0.8rem;color:{COLORS["text_secondary"]};'
-            f'font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'
-            f'&ldquo;{_html.escape(quote_preview)}&rdquo;</div>'
-            f'<div style="flex-shrink:0;display:flex;align-items:center;gap:8px;">'
-            f'{outcome_pill(outcome)}'
-            f'<span style="font-size:0.75rem;color:{conf_color};font-family:\'JetBrains Mono\',monospace;">'
-            f'{conf_str}</span>'
-            f'</div></div>'
-        )
-    else:
-        card_html += (
-            f'<div style="display:flex;justify-content:flex-end;gap:8px;align-items:center;">'
-            f'{outcome_pill(outcome)}'
-            f'<span style="font-size:0.75rem;color:{conf_color};font-family:\'JetBrains Mono\',monospace;">'
-            f'{conf_str}</span>'
-            f'</div>'
-        )
-
-    card_html += '</div>'
     st.markdown(card_html, unsafe_allow_html=True)
 
 
@@ -549,6 +582,7 @@ def call_detail_panel(row: dict[str, Any], call_detail: dict[str, Any] | None, i
     flags = row.get("flags")
     quotes = row.get("key_quotes")
     signals = row.get("confusion_signals")
+    raw = row.get("raw_analysis")
 
     # 1. Situation summary
     st.markdown(
@@ -569,7 +603,7 @@ def call_detail_panel(row: dict[str, Any], call_detail: dict[str, Any] | None, i
             f'font-style:italic;color:{COLORS["text_primary"]};font-size:0.86rem;'
             f'line-height:1.6;'
         )
-        for q in quotes:
+        for q in (q for q in quotes if q):
             text = q.get("quote", "") if isinstance(q, dict) else str(q)
             ctx = q.get("context") if isinstance(q, dict) else None
             st.markdown(
@@ -612,23 +646,41 @@ def call_detail_panel(row: dict[str, Any], call_detail: dict[str, Any] | None, i
     # 4. Flags
     if flags and isinstance(flags, list) and len(flags) > 0:
         _default_style = f"background:{COLORS['bg_elevated']};color:{COLORS['text_secondary']};"
-        flag_html = " ".join(
-            f'<span style="{FLAG_STYLES.get(f, (_default_style,))[0]}'
-            f'padding:3px 10px;border-radius:6px;font-size:0.78em;font-weight:500;">'
-            f'{_html.escape(FLAG_STYLES.get(f, (None, _fmt(f)))[1])}</span>'
-            for f in flags
-        )
+        flag_parts = []
+        for f in (f for f in flags if f):
+            style, label = FLAG_STYLES.get(f, (_default_style, _fmt(f)))
+            flag_parts.append(
+                f'<span style="{style}'
+                f'padding:3px 10px;border-radius:6px;font-size:0.78em;font-weight:500;">'
+                f'{_html.escape(label)}</span>'
+            )
+        flag_html = " ".join(flag_parts)
         st.markdown(
-            f'<div style="margin:0 0 0.6rem 0;"><span style="font-size:0.72rem;font-weight:600;'
-            f'letter-spacing:0.06em;text-transform:uppercase;color:{COLORS["text_muted"]};'
-            f'margin-right:8px;">FLAGS</span>{flag_html}</div>',
+            f'<div style="margin:0.5rem 0 0.6rem 0;display:flex;align-items:center;gap:8px;'
+            f'flex-wrap:wrap;">'
+            f'<span style="font-size:0.68rem;font-weight:600;'
+            f'letter-spacing:0.08em;text-transform:uppercase;color:{COLORS["text_muted"]};">'
+            f'FLAGS</span>{flag_html}</div>',
             unsafe_allow_html=True,
         )
 
-    # 5. Confusion signals
+    # 5. Confusion signals + who they thought they called
+    if brand_confused:
+        section_divider("Brand Confusion")
+        if isinstance(raw, dict):
+            who = raw.get("who_they_thought_they_called", "")
+            if who:
+                who_label = WHO_LABELS.get(who, _fmt(str(who)))
+                st.markdown(
+                    f'<div style="font-size:0.88rem;color:{COLORS["amber"]};'
+                    f'margin-bottom:0.5rem;">'
+                    f'Thought they called: <strong>{_html.escape(who_label)}</strong></div>',
+                    unsafe_allow_html=True,
+                )
     if signals and isinstance(signals, list) and len(signals) > 0:
-        section_divider("Confusion Signals")
-        for sig in signals:
+        if not brand_confused:
+            section_divider("Confusion Signals")
+        for sig in (s for s in signals if s):
             st.markdown(
                 f'<div style="padding:0.4rem 0.8rem;margin:0.3rem 0;'
                 f'border-left:3px solid {COLORS["rose"]};'
@@ -641,10 +693,8 @@ def call_detail_panel(row: dict[str, Any], call_detail: dict[str, Any] | None, i
             )
 
     # 6. Raw analysis JSON
-    raw = row.get("raw_analysis")
     if raw:
         with st.expander("Raw Analysis JSON", expanded=False):
-            import json
             if isinstance(raw, str):
                 try:
                     raw = json.loads(raw)

@@ -23,7 +23,16 @@ def check_password() -> bool:
     1. session_state["authenticated"] — same-tab fast path
     2. query_params["_session"] — cross-refresh persistence via DB
     3. Login form — email + password
+
+    Set env LOCAL_DEV=1 to bypass auth for local testing.
     """
+    # 0. Local dev bypass
+    import os
+    if os.getenv("LOCAL_DEV") == "1":
+        st.session_state["authenticated"] = True
+        st.session_state.setdefault("user_display_name", "Local Dev")
+        return True
+
     # 1. Already authenticated this tab
     if st.session_state.get("authenticated"):
         return True
@@ -47,6 +56,8 @@ def check_password() -> bool:
             st.session_state["user_email"] = user["user_email"]
             st.session_state["user_display_name"] = user.get("user_display_name") or user["user_email"]
             st.session_state["session_token"] = session_token
+            # Remove token from URL to reduce exposure (referer leaks, browser history)
+            del st.query_params["_session"]
             return True
         else:
             # Expired/invalid token — clear it
@@ -83,7 +94,7 @@ def check_password() -> bool:
             "Password", type="password", key="login_password",
             placeholder="Password",
         )
-        if st.button("Sign in", type="primary", use_container_width=True):
+        if st.button("Sign in", type="primary"):
             if not email or not password:
                 st.error("Enter both email and password.")
             else:
