@@ -1,4 +1,4 @@
-"""Supabase email/password authentication for Invoca Intent Explorer."""
+"""Supabase email/password authentication for Call Intent & Confusion Portal."""
 
 from __future__ import annotations
 
@@ -69,7 +69,7 @@ def check_password() -> bool:
         'border-radius:2px;margin-bottom:1.2rem;opacity:0.85;"></div>',
         unsafe_allow_html=True,
     )
-    st.title("Invoca Intent Explorer")
+    st.title("Call Intent & Confusion Portal")
 
     _, center, _ = st.columns([1, 1.2, 1])
     with center:

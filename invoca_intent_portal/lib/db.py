@@ -1,4 +1,8 @@
-"""Single data access module for Invoca Intent Explorer."""
+"""Data access module for Call Intent & Confusion Portal.
+
+Reads from public.analysis_results (Walker Brain, read-only).
+Auth writes go to invoca.portal_users / invoca.portal_sessions (portal's own tables).
+"""
 
 from __future__ import annotations
 
@@ -9,8 +13,15 @@ import pandas as pd
 import streamlit as st
 
 
-def _table(client: Any, table_name: str) -> Any:
-    return client.schema("invoca").table(table_name)
+_LIST_COLS = (
+    "id, source_transcript_id, call_start_date, call_duration_seconds, "
+    "primary_topic, primary_intent, outcome, emotional_tone, "
+    "quality_score, case_type, summary, key_quote, "
+    "category_confusion, process_confusion_points, "
+    "brand_reference, other_brands_mentioned, channel_referenced, "
+    "agent_empathy_score, agent_education_quality, agent_closing_effectiveness, "
+    "confidence_score, needs_review, review_reason, original_language"
+)
 
 
 def _as_df(data: list[dict[str, Any]]) -> pd.DataFrame:
@@ -20,134 +31,53 @@ def _as_df(data: list[dict[str, Any]]) -> pd.DataFrame:
 
 
 @st.cache_data(ttl=300, show_spinner=False)
-def get_analyzed_calls(
+def get_calls(
     _client: Any,
     start_date: date,
     end_date: date,
-    brand_code: str | None = None,
-    limit: int = 500,
+    limit: int = 5000,
 ) -> pd.DataFrame:
-    """Join calls + analysis into a single DataFrame."""
-    query = (
-        _table(_client, "calls")
-        .select(
-            "id,invoca_call_id,brand_code,advertiser_name,"
-            "call_date_pt,call_start_time,duration_seconds,status,"
-            "transcript_word_count"
-        )
-        .eq("status", "analyzed")
-        .gte("call_date_pt", start_date.isoformat())
-        .lte("call_date_pt", end_date.isoformat())
-        .order("call_start_time", desc=True)
-        .limit(limit)
-    )
-    if brand_code and brand_code.upper() != "ALL":
-        query = query.eq("brand_code", brand_code)
-
-    calls_rows = query.execute().data or []
-    calls_df = _as_df(calls_rows)
-    if calls_df.empty:
-        return calls_df
-
-    call_ids = calls_df["id"].tolist()
-    analysis_rows = (
-        _table(_client, "analysis")
-        .select(
-            "call_id,analyzed_at,caller_intent,intent_confidence,brand_confusion,"
-            "confusion_signals,call_outcome,agent_quality_score,caller_sentiment,"
-            "key_quotes,validation_passed,"
-            "case_type,caller_situation,flags,raw_analysis"
-        )
-        .in_("call_id", call_ids)
-        .order("analyzed_at", desc=True)
-        .execute()
-        .data
-        or []
-    )
-    analysis_df = _as_df(analysis_rows)
-
-    if not analysis_df.empty:
-        analysis_df["analyzed_at"] = pd.to_datetime(
-            analysis_df["analyzed_at"], utc=True, errors="coerce"
-        )
-        analysis_df = (
-            analysis_df.sort_values("analyzed_at", ascending=False)
-            .drop_duplicates(subset=["call_id"], keep="first")
-        )
-
-    if not analysis_df.empty:
-        calls_df = calls_df.merge(
-            analysis_df, how="left", left_on="id", right_on="call_id",
-        )
-    calls_df["call_start_time"] = pd.to_datetime(
-        calls_df.get("call_start_time"), utc=True, errors="coerce"
-    )
-    if "call_date_pt" in calls_df.columns:
-        calls_df["call_date_pt"] = pd.to_datetime(
-            calls_df["call_date_pt"], errors="coerce"
-        ).dt.date
-    return calls_df
-
-
-@st.cache_data(ttl=3600, show_spinner=False)
-def get_brands(_client: Any) -> list[dict[str, str]]:
-    """Active brands for sidebar selector."""
+    """Fetch calls from public.analysis_results (read-only)."""
     rows = (
-        _table(_client, "brands")
-        .select("brand_code,brand_name")
-        .eq("active", True)
-        .order("priority", desc=False)
+        _client.table("analysis_results")
+        .select(_LIST_COLS)
+        .gte("call_start_date", f"{start_date.isoformat()}T00:00:00")
+        .lte("call_start_date", f"{end_date.isoformat()}T23:59:59")
+        .order("call_start_date", desc=True)
+        .limit(limit)
         .execute()
-        .data
-        or []
+        .data or []
     )
-    return rows
-
-
-def get_call_detail(
-    client: Any, call_id: str,
-) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
-    """Single call + analysis rows for detail page.
-
-    Accepts either a numeric DB id or an Invoca call ID string.
-    """
-    if call_id.isdigit():
-        call_rows = (
-            _table(client, "calls")
-            .select("*")
-            .eq("id", int(call_id))
-            .limit(1)
-            .execute()
-            .data or []
+    df = _as_df(rows)
+    if not df.empty and "call_start_date" in df.columns:
+        df["call_start_date"] = pd.to_datetime(
+            df["call_start_date"], utc=True, errors="coerce"
         )
-    else:
-        call_rows = (
-            _table(client, "calls")
-            .select("*")
-            .eq("invoca_call_id", call_id)
-            .order("call_start_time", desc=True)
-            .limit(1)
-            .execute()
-            .data or []
+        df["call_date"] = (
+            df["call_start_date"]
+            .dt.tz_convert("America/Los_Angeles")
+            .dt.date
         )
+    return df
 
-    if not call_rows:
-        return None, []
 
-    call = call_rows[0]
-    analysis_rows = (
-        _table(client, "analysis")
-        .select("*")
-        .eq("call_id", call["id"])
-        .order("analyzed_at", desc=True)
+def get_transcript(client: Any, call_id: int) -> str | None:
+    """Fetch transcript for a single call (lazy-loaded)."""
+    rows = (
+        client.table("analysis_results")
+        .select("transcript_original")
+        .eq("id", call_id)
+        .limit(1)
         .execute()
-        .data
-        or []
+        .data or []
     )
-    return call, analysis_rows
+    if rows:
+        return rows[0].get("transcript_original")
+    return None
 
 
-# ── Auth helpers ─────────────────────────────────────────────────────────
+# ── Auth helpers (write to invoca.portal_users / invoca.portal_sessions) ──
+
 
 def authenticate_user(
     client: Any, email: str, password: str,

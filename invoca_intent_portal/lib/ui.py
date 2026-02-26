@@ -1,16 +1,14 @@
-"""Shared UI helpers for Streamlit pages."""
+"""Shared UI helpers for Call Intent & Confusion Portal."""
 
 from __future__ import annotations
 
 import html as _html
-import json
 from typing import Any
 
 import plotly.graph_objects as go
 import streamlit as st
 
 # ── Color palette ─────────────────────────────────────────────────────────
-# Dark navy base with teal accent, warm amber secondary
 COLORS = {
     "bg_primary": "#0f172a",
     "bg_surface": "#1e293b",
@@ -20,7 +18,7 @@ COLORS = {
     "text_primary": "#e2e8f0",
     "text_secondary": "#94a3b8",
     "text_muted": "#64748b",
-    "accent": "#22d3ee",       # cyan/teal
+    "accent": "#22d3ee",
     "accent_dim": "#164e63",
     "amber": "#f59e0b",
     "amber_dim": "#78350f",
@@ -29,96 +27,77 @@ COLORS = {
     "violet": "#a78bfa",
 }
 
-# Chart color sequence: distinctive, readable on dark backgrounds
 CHART_COLORS = [
-    "#22d3ee",  # cyan
-    "#f59e0b",  # amber
-    "#34d399",  # emerald
-    "#fb7185",  # rose
-    "#a78bfa",  # violet
-    "#38bdf8",  # sky
-    "#fbbf24",  # yellow
-    "#6ee7b7",  # mint
-    "#f472b6",  # pink
-    "#818cf8",  # indigo
+    "#22d3ee", "#f59e0b", "#34d399", "#fb7185", "#a78bfa",
+    "#38bdf8", "#fbbf24", "#6ee7b7", "#f472b6", "#818cf8",
 ]
 
-# ── Intent / Outcome color maps ───────────────────────────────────────────
+# ── Intent / Outcome / Tone color maps (Walker Brain values) ─────────────
 
 INTENT_COLORS: dict[str, tuple[str, str]] = {
-    # (text_color, bg_color)
-    "injury_new_case":     ("#34d399", "rgba(52,211,153,0.15)"),
-    "property_only":       ("#f59e0b", "rgba(245,158,11,0.15)"),
-    "already_represented": ("#a78bfa", "rgba(167,139,250,0.15)"),
-    "insurance_inquiry":   ("#fb7185", "rgba(251,113,133,0.15)"),
-    "existing_case":       ("#38bdf8", "rgba(56,189,248,0.15)"),
-    "wrong_number":        ("#94a3b8", "rgba(148,163,184,0.10)"),
-    "general_question":    ("#fbbf24", "rgba(251,191,36,0.15)"),
-    "spam":                ("#64748b", "rgba(100,116,139,0.10)"),
-    "other":               ("#94a3b8", "rgba(148,163,184,0.10)"),
+    "seeking_representation":   ("#34d399", "rgba(52,211,153,0.15)"),
+    "information_only":         ("#38bdf8", "rgba(56,189,248,0.15)"),
+    "calling_for_someone_else": ("#a78bfa", "rgba(167,139,250,0.15)"),
+    "follow_up":                ("#fbbf24", "rgba(251,191,36,0.15)"),
+    "urgent_action":            ("#fb7185", "rgba(251,113,133,0.15)"),
+    "trust_verification":       ("#f59e0b", "rgba(245,158,11,0.15)"),
+    "cost_inquiry":             ("#22d3ee", "rgba(34,211,238,0.15)"),
+    "referral":                 ("#6ee7b7", "rgba(110,231,183,0.15)"),
 }
 
 OUTCOME_COLORS: dict[str, tuple[str, str]] = {
-    "connected":       ("#34d399", "rgba(52,211,153,0.15)"),
-    "callback_set":    ("#22d3ee", "rgba(34,211,238,0.15)"),
-    "caller_declined": ("#f59e0b", "rgba(245,158,11,0.15)"),
-    "not_applicable":  ("#94a3b8", "rgba(148,163,184,0.10)"),
-    "caller_dropped":  ("#fb7185", "rgba(251,113,133,0.15)"),
-    "wrong_number":    ("#64748b", "rgba(100,116,139,0.10)"),
-    "other":           ("#94a3b8", "rgba(148,163,184,0.10)"),
+    "referral-made":            ("#34d399", "rgba(52,211,153,0.15)"),
+    "callback-requested":       ("#22d3ee", "rgba(34,211,238,0.15)"),
+    "consultation-scheduled":   ("#a78bfa", "rgba(167,139,250,0.15)"),
+    "not-qualified":            ("#f59e0b", "rgba(245,158,11,0.15)"),
+    "information-only":         ("#94a3b8", "rgba(148,163,184,0.10)"),
+    "other":                    ("#64748b", "rgba(100,116,139,0.10)"),
 }
 
-SENTIMENT_COLORS: dict[str, tuple[str, str]] = {
-    "positive":   ("#34d399", "rgba(52,211,153,0.15)"),
+TONE_COLORS: dict[str, tuple[str, str]] = {
+    "frustrated": ("#fb7185", "rgba(251,113,133,0.15)"),
     "neutral":    ("#94a3b8", "rgba(148,163,184,0.10)"),
     "confused":   ("#f59e0b", "rgba(245,158,11,0.15)"),
-    "frustrated": ("#fb7185", "rgba(251,113,133,0.15)"),
+    "concerned":  ("#fbbf24", "rgba(251,191,36,0.15)"),
+    "distressed": ("#ef4444", "rgba(239,68,68,0.15)"),
+    "fearful":    ("#f472b6", "rgba(244,114,182,0.15)"),
+    "anxious":    ("#818cf8", "rgba(129,140,248,0.15)"),
+    "hopeful":    ("#34d399", "rgba(52,211,153,0.15)"),
     "angry":      ("#ef4444", "rgba(239,68,68,0.15)"),
+    "relieved":   ("#6ee7b7", "rgba(110,231,183,0.15)"),
 }
 
 
 def apply_base_styles() -> None:
-    """Apply dark-theme visual baseline across portal pages."""
+    """Apply dark-theme visual baseline."""
     st.markdown(
         """
         <style>
-        /* ── Import fonts ─────────────────────────────── */
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap');
 
-        /* ── Global typography ────────────────────────── */
         html, body, [class*="css"] {
             font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
         }
-
-        /* ── Main container ───────────────────────────── */
         .main .block-container {
             padding-top: 1.5rem;
             padding-bottom: 2rem;
             max-width: 1400px;
         }
-
-        /* ── Page title ───────────────────────────────── */
         h1 {
             font-weight: 700 !important;
             letter-spacing: -0.03em !important;
             font-size: 2rem !important;
             color: #f1f5f9 !important;
         }
-
-        /* ── Subheadings ──────────────────────────────── */
         h2, h3 {
             font-weight: 600 !important;
             letter-spacing: -0.02em !important;
             color: #cbd5e1 !important;
         }
-
-        /* ── Caption text ─────────────────────────────── */
         .stCaption, [data-testid="stCaptionContainer"] {
             color: #64748b !important;
             font-size: 0.9rem !important;
         }
-
-        /* ── KPI metric cards ─────────────────────────── */
         div[data-testid="stMetric"] {
             background: linear-gradient(145deg, #1a2740 0%, #1e293b 60%, #222f43 100%);
             border: 1px solid #334155;
@@ -154,8 +133,6 @@ def apply_base_styles() -> None:
             text-overflow: ellipsis !important;
             line-height: 1.3 !important;
         }
-
-        /* ── Data table ───────────────────────────────── */
         div[data-testid="stDataFrame"] {
             border: 1px solid #2d3b50;
             border-radius: 12px;
@@ -163,8 +140,6 @@ def apply_base_styles() -> None:
             background: linear-gradient(180deg, #1a2740 0%, #1e293b 100%);
             box-shadow: 0 1px 4px rgba(0,0,0,0.15);
         }
-
-        /* ── Sidebar styling ──────────────────────────── */
         section[data-testid="stSidebar"] {
             border-right: 1px solid #1e293b;
         }
@@ -176,12 +151,32 @@ def apply_base_styles() -> None:
             margin-bottom: 0.5rem !important;
             font-weight: 600 !important;
         }
-        /* ── Buttons ──────────────────────────────────── */
         button[kind="primary"] {
+            background: linear-gradient(135deg, #0891b2 0%, #22d3ee 100%) !important;
+            border: none !important;
             border-radius: 10px !important;
+            color: #0f172a !important;
+            font-weight: 600 !important;
+            letter-spacing: 0.02em !important;
+            transition: box-shadow 0.2s ease, transform 0.1s ease !important;
         }
-
-        /* ── Expanders ────────────────────────────────── */
+        button[kind="primary"]:hover {
+            box-shadow: 0 4px 16px rgba(34,211,238,0.25) !important;
+            transform: translateY(-1px) !important;
+        }
+        button[kind="secondary"] {
+            background: #1e293b !important;
+            border: 1px solid #334155 !important;
+            border-radius: 10px !important;
+            color: #94a3b8 !important;
+            font-weight: 500 !important;
+            transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease !important;
+        }
+        button[kind="secondary"]:hover {
+            border-color: #475569 !important;
+            color: #e2e8f0 !important;
+            background: #273548 !important;
+        }
         details {
             border: 1px solid #2d3b50 !important;
             border-radius: 0 0 12px 12px !important;
@@ -202,8 +197,6 @@ def apply_base_styles() -> None:
             border-bottom: 1px solid #2d3b50 !important;
             margin-bottom: 0.4rem !important;
         }
-
-        /* ── Text areas ───────────────────────────────── */
         textarea {
             border: 1px solid #334155 !important;
             border-radius: 10px !important;
@@ -211,18 +204,8 @@ def apply_base_styles() -> None:
             font-size: 0.82rem !important;
             line-height: 1.65 !important;
         }
-
-        /* ── Horizontal dividers ──────────────────────── */
-        hr {
-            border-color: #1e293b !important;
-        }
-
-        /* ── Links ────────────────────────────────────── */
-        a {
-            color: #22d3ee !important;
-        }
-
-        /* ── Plotly chart containers ──────────────────── */
+        hr { border-color: #1e293b !important; }
+        a { color: #22d3ee !important; }
         div[data-testid="stPlotlyChart"] {
             border: 1px solid #2d3b50;
             border-radius: 12px;
@@ -235,8 +218,6 @@ def apply_base_styles() -> None:
             border-color: #3d4f69;
             box-shadow: 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.02);
         }
-
-        /* ── Chart section titles ────────────────────── */
         .chart-title {
             font-size: 0.74rem;
             font-weight: 600;
@@ -246,28 +227,20 @@ def apply_base_styles() -> None:
             margin: 1.2rem 0 0.25rem 0;
             padding-left: 4px;
         }
-
-        /* ── Metric delta (green arrow + pct) ─────────── */
         div[data-testid="stMetric"] [data-testid="stMetricDelta"] {
             font-size: 0.78rem !important;
             font-weight: 500 !important;
         }
-
-        /* ── Download button refinement ───────────────── */
         button[data-testid="stDownloadButton"] {
             border-radius: 10px !important;
             font-weight: 500 !important;
             letter-spacing: 0.02em !important;
         }
-
-        /* ── Selectbox refinement ─────────────────────── */
         div[data-testid="stSelectbox"] label {
             font-size: 0.82rem !important;
             font-weight: 500 !important;
             color: #94a3b8 !important;
         }
-
-        /* ── Login card ──────────────────────────────── */
         .login-card {
             background: linear-gradient(145deg, #1a2740 0%, #1e293b 60%, #1a2740 100%);
             border: 1px solid #2d3b50;
@@ -285,8 +258,6 @@ def apply_base_styles() -> None:
             margin-bottom: 1.2rem;
             text-align: center;
         }
-
-        /* ── Text input refinement (login + filters) ── */
         div[data-testid="stTextInput"] input {
             background: #0f172a !important;
             border: 1px solid #2d3b50 !important;
@@ -300,51 +271,13 @@ def apply_base_styles() -> None:
             border-color: #22d3ee !important;
             box-shadow: 0 0 0 2px rgba(34,211,238,0.12) !important;
         }
-        div[data-testid="stTextInput"] input::placeholder {
-            color: #475569 !important;
-        }
+        div[data-testid="stTextInput"] input::placeholder { color: #475569 !important; }
         div[data-testid="stTextInput"] label {
             font-size: 0.78rem !important;
             font-weight: 500 !important;
             color: #8b9db8 !important;
             letter-spacing: 0.02em !important;
         }
-
-        /* ── Primary button refinement ───────────────── */
-        button[kind="primary"] {
-            background: linear-gradient(135deg, #0891b2 0%, #22d3ee 100%) !important;
-            border: none !important;
-            border-radius: 10px !important;
-            color: #0f172a !important;
-            font-weight: 600 !important;
-            letter-spacing: 0.02em !important;
-            transition: box-shadow 0.2s ease, transform 0.1s ease !important;
-        }
-        button[kind="primary"]:hover {
-            box-shadow: 0 4px 16px rgba(34,211,238,0.25) !important;
-            transform: translateY(-1px) !important;
-        }
-        button[kind="primary"]:active {
-            transform: translateY(0) !important;
-        }
-
-        /* ── Secondary button refinement ──────────────── */
-        button[kind="secondary"] {
-            background: #1e293b !important;
-            border: 1px solid #334155 !important;
-            border-radius: 10px !important;
-            color: #94a3b8 !important;
-            font-weight: 500 !important;
-            letter-spacing: 0.02em !important;
-            transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease !important;
-        }
-        button[kind="secondary"]:hover {
-            border-color: #475569 !important;
-            color: #e2e8f0 !important;
-            background: #273548 !important;
-        }
-
-        /* ── Transcript code block ─────────────────────── */
         div[data-testid='stCode'] {
             border: 1px solid #334155;
             border-radius: 10px;
@@ -360,12 +293,8 @@ def apply_base_styles() -> None:
             line-height: 1.7 !important;
             padding: 1rem 1.2rem !important;
         }
-        div[data-testid='stCode'] pre::-webkit-scrollbar {
-            width: 6px;
-        }
-        div[data-testid='stCode'] pre::-webkit-scrollbar-track {
-            background: #1e293b;
-        }
+        div[data-testid='stCode'] pre::-webkit-scrollbar { width: 6px; }
+        div[data-testid='stCode'] pre::-webkit-scrollbar-track { background: #1e293b; }
         div[data-testid='stCode'] pre::-webkit-scrollbar-thumb {
             background: #475569;
             border-radius: 3px;
@@ -416,35 +345,7 @@ def apply_chart_defaults(fig: go.Figure) -> go.Figure:
     return fig
 
 
-# ── Shared detail-panel helpers ──────────────────────────────────────────
-
-# ── Tier classification constants ────────────────────────────────────────
-VALID_INTENTS = {
-    "injury_new_case", "property_only", "already_represented",
-    "existing_case", "general_question",
-}
-
-TIER_COLORS = {
-    "Valid Inquiries": "#34d399",   # emerald
-    "Wrong / Noise":   "#fb7185",   # rose
-}
-
-# Readable labels for raw_analysis->who_they_thought_they_called
-WHO_LABELS: dict[str, str] = {
-    "insurance_company": "Insurance Company",
-    "specific_company": "Specific Company",
-    "claims_department": "Claims Dept",
-    "attorney_service": "Attorney Service",
-    "government_agency": "Government Agency",
-    "unclear": "Unclear",
-}
-
-FLAG_STYLES: dict[str, tuple[str, str]] = {
-    "brand_confusion": ("background:#7f1d1d;color:#fca5a5;", "Brand Confusion"),
-    "compliance_concern": ("background:#7f1d1d;color:#fca5a5;", "Compliance Concern"),
-    "training_opportunity": ("background:#78350f;color:#fbbf24;", "Training Opportunity"),
-    "exceptional_handling": ("background:#064e3b;color:#6ee7b7;", "Exceptional Handling"),
-}
+# ── Generic helpers ──────────────────────────────────────────────────────
 
 
 def val(obj: object) -> str:
@@ -456,8 +357,8 @@ def val(obj: object) -> str:
 
 
 def _fmt(s: str) -> str:
-    """Format snake_case DB values into readable labels."""
-    return s.replace("_", " ").title() if s else s
+    """Format snake_case / kebab-case DB values into readable labels."""
+    return s.replace("_", " ").replace("-", " ").title() if s else s
 
 
 def chart_title(label: str) -> None:
@@ -492,71 +393,53 @@ def badge_pill(label: str, text_color: str, bg_color: str) -> str:
 
 
 def intent_pill(intent: str) -> str:
-    """Badge pill for a caller_intent value."""
+    """Badge pill for a primary_intent value."""
     tc, bg = INTENT_COLORS.get(intent, ("#94a3b8", "rgba(148,163,184,0.10)"))
     return badge_pill(_fmt(intent), tc, bg)
 
 
 def outcome_pill(outcome: str) -> str:
-    """Badge pill for a call_outcome value."""
+    """Badge pill for an outcome value."""
     tc, bg = OUTCOME_COLORS.get(outcome, ("#94a3b8", "rgba(148,163,184,0.10)"))
     return badge_pill(_fmt(outcome), tc, bg)
 
 
-def sentiment_pill(sentiment: str) -> str:
-    """Badge pill for a caller_sentiment value."""
-    tc, bg = SENTIMENT_COLORS.get(sentiment, ("#94a3b8", "rgba(148,163,184,0.10)"))
-    return badge_pill(_fmt(sentiment), tc, bg)
+def tone_pill(tone: str) -> str:
+    """Badge pill for an emotional_tone value."""
+    tc, bg = TONE_COLORS.get(tone, ("#94a3b8", "rgba(148,163,184,0.10)"))
+    return badge_pill(_fmt(tone), tc, bg)
 
 
-def tier_section_divider(label: str, count: int, tier: str) -> None:
-    """Render a colored tier section header."""
-    color = TIER_COLORS.get(tier, COLORS["text_muted"])
-    st.markdown(
-        f'<div style="margin:1.6rem 0 0.7rem 0;padding:0.5rem 0.8rem 0.45rem;'
-        f'border-left:3px solid {color};'
-        f'background:linear-gradient(90deg,{color}0d 0%,transparent 70%);'
-        f'border-radius:0 6px 6px 0;'
-        f'font-size:0.82rem;font-weight:600;letter-spacing:0.08em;'
-        f'text-transform:uppercase;color:{color};">'
-        f'{_html.escape(label)}'
-        f'<span style="margin-left:8px;color:{COLORS["text_muted"]};font-weight:400;">'
-        f'({count})</span></div>',
-        unsafe_allow_html=True,
-    )
+# ── Call card + detail panel ─────────────────────────────────────────────
 
 
 def call_card(row: dict[str, Any], idx: int) -> None:
-    """Render a situation-dominant call summary card."""
-    intent = str(row.get("caller_intent") or "other")
-    situation = str(row.get("caller_situation") or "")
-    outcome = str(row.get("call_outcome") or "other")
-    date_val = str(row.get("call_date_pt") or "")
-    duration = row.get("duration_seconds") or ""
-    brand_confused = row.get("brand_confusion", False)
+    """Render a call summary card (situation-dominant)."""
+    topic = str(row.get("primary_topic") or "")
+    intent = str(row.get("primary_intent") or "other")
+    outcome = str(row.get("outcome") or "other")
+    date_val = str(row.get("call_date") or "")
+    duration = row.get("call_duration_seconds") or ""
+    confused = row.get("category_confusion", False)
 
-    # Truncate situation for card
-    situation_short = situation[:200] + "..." if len(situation) > 200 else situation
+    topic_short = topic[:200] + "..." if len(topic) > 200 else topic
 
-    # Confusion badge
     bc_badge = ""
-    if brand_confused:
+    if confused:
         bc_badge = (
-            f' <span style="display:inline-flex;align-items:center;padding:2px 8px;'
-            f'border-radius:5px;font-size:0.72em;font-weight:500;'
-            f'background:rgba(251,113,133,0.15);color:#fb7185;'
-            f'border:1px solid #fb718533;">Confused</span>'
+            ' <span style="display:inline-flex;align-items:center;padding:2px 8px;'
+            'border-radius:5px;font-size:0.72em;font-weight:500;'
+            'background:rgba(251,113,133,0.15);color:#fb7185;'
+            'border:1px solid #fb718533;">Confused</span>'
         )
 
     card_html = (
         f'<div style="background:linear-gradient(145deg,#1a2740 0%,#1e293b 60%,#222f43 100%);'
         f'border:1px solid #2d3b50;border-radius:12px;padding:0.85rem 1.1rem;'
         f'margin-bottom:0.5rem;">'
-        # Line 1: situation (dominant)
         f'<div style="font-size:0.92rem;color:{COLORS["text_primary"]};line-height:1.45;'
         f'margin-bottom:0.4rem;">'
-        f'{_html.escape(situation_short)}</div>'
-        # Line 2: intent pill + confusion badge + date · duration · outcome
+        f'{_html.escape(topic_short)}</div>'
         f'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
         f'{intent_pill(intent)}{bc_badge}'
         f'<span style="flex:1;"></span>'
@@ -569,73 +452,68 @@ def call_card(row: dict[str, Any], idx: int) -> None:
     st.markdown(card_html, unsafe_allow_html=True)
 
 
-def call_detail_panel(row: dict[str, Any], call_detail: dict[str, Any] | None, idx: int = 0) -> None:
+def call_detail_panel(row: dict[str, Any], idx: int = 0) -> None:
     """Render detail content inside an st.expander for a call."""
-    intent = str(row.get("caller_intent") or "other")
-    situation = str(row.get("caller_situation") or "No situation summary available.")
-    outcome = str(row.get("call_outcome") or "other")
-    sentiment = str(row.get("caller_sentiment") or "")
+    summary = str(row.get("summary") or "")
+    intent = str(row.get("primary_intent") or "other")
+    outcome = str(row.get("outcome") or "other")
+    tone = str(row.get("emotional_tone") or "")
     case_type = str(row.get("case_type") or "")
-    quality = row.get("agent_quality_score")
-    brand_confused = row.get("brand_confusion", False)
-    confidence = row.get("intent_confidence")
-    flags = row.get("flags")
-    quotes = row.get("key_quotes")
-    signals = row.get("confusion_signals")
-    raw = row.get("raw_analysis")
+    quality = row.get("quality_score")
+    confidence = row.get("confidence_score")
+    confused = row.get("category_confusion", False)
+    key_quote = row.get("key_quote")
+    confusion_points = row.get("process_confusion_points")
+    brands_mentioned = row.get("other_brands_mentioned")
+    channel = row.get("channel_referenced")
+    empathy = row.get("agent_empathy_score")
+    education = row.get("agent_education_quality")
+    closing = row.get("agent_closing_effectiveness")
+    needs_review = row.get("needs_review", False)
+    review_reason = row.get("review_reason")
 
-    # 1. Situation summary
-    st.markdown(
-        f'<div style="font-size:0.92rem;color:{COLORS["text_primary"]};line-height:1.5;'
-        f'margin-bottom:0.8rem;">{_html.escape(situation)}</div>',
-        unsafe_allow_html=True,
-    )
+    # 1. Summary
+    if summary:
+        st.markdown(
+            f'<div style="font-size:0.92rem;color:{COLORS["text_primary"]};line-height:1.5;'
+            f'margin-bottom:0.8rem;">{_html.escape(summary)}</div>',
+            unsafe_allow_html=True,
+        )
 
-    # 2. Key quotes (prominently)
-    if quotes and isinstance(quotes, list) and len(quotes) > 0:
-        section_divider("Key Quotes")
-        _quote_style = (
-            f'padding:0.6rem 1rem;margin:0.4rem 0;'
+    # 2. Key quote
+    if key_quote:
+        section_divider("Key Quote")
+        st.markdown(
+            f'<div style="padding:0.6rem 1rem;margin:0.4rem 0;'
             f'border-left:3px solid {COLORS["accent"]};'
             f'background:linear-gradient(135deg,{COLORS["bg_elevated"]} 0%,#1e293b 100%);'
             f'border:1px solid #2d3b50;border-left:3px solid {COLORS["accent"]};'
             f'border-radius:0 10px 10px 0;'
             f'font-style:italic;color:{COLORS["text_primary"]};font-size:0.86rem;'
-            f'line-height:1.6;'
+            f'line-height:1.6;">&ldquo;{_html.escape(str(key_quote))}&rdquo;</div>',
+            unsafe_allow_html=True,
         )
-        for q in (q for q in quotes if q):
-            text = q.get("quote", "") if isinstance(q, dict) else str(q)
-            ctx = q.get("context") if isinstance(q, dict) else None
-            st.markdown(
-                f'<div style="{_quote_style}">&ldquo;{_html.escape(text)}&rdquo;</div>',
-                unsafe_allow_html=True,
-            )
-            if ctx:
-                st.markdown(
-                    f'<div style="font-size:0.74rem;color:{COLORS["text_muted"]};'
-                    f'margin:-0.1rem 0 0.3rem 1.1rem;font-style:normal;">'
-                    f'{_html.escape(str(ctx))}</div>',
-                    unsafe_allow_html=True,
-                )
 
-    # 3. Analysis chips row
+    # 3. Analysis chips
     section_divider("Analysis")
-    chips = [
-        intent_pill(intent),
-        outcome_pill(outcome),
-    ]
-    if sentiment:
-        chips.append(sentiment_pill(sentiment))
-    if case_type and case_type != "not_applicable":
+    chips = [intent_pill(intent), outcome_pill(outcome)]
+    if tone:
+        chips.append(tone_pill(tone))
+    if case_type:
         chips.append(badge_pill(_fmt(case_type), "#38bdf8", "rgba(56,189,248,0.15)"))
     if quality is not None:
-        q_color = "#34d399" if quality >= 7 else ("#f59e0b" if quality >= 5 else "#fb7185")
-        chips.append(badge_pill(f"Quality: {quality}/10", q_color, f"{q_color}22"))
+        q_color = "#34d399" if quality >= 70 else ("#f59e0b" if quality >= 50 else "#fb7185")
+        chips.append(badge_pill(f"Quality: {quality}/100", q_color, f"{q_color}22"))
     if confidence is not None:
-        c_color = "#34d399" if confidence >= 80 else ("#f59e0b" if confidence >= 60 else "#fb7185")
-        chips.append(badge_pill(f"Conf: {confidence}%", c_color, f"{c_color}22"))
-    if brand_confused:
-        chips.append(badge_pill("Brand Confused", "#fca5a5", "rgba(127,29,29,0.5)"))
+        c_val = float(confidence)
+        if c_val <= 1:
+            c_color = "#34d399" if c_val >= 0.8 else ("#f59e0b" if c_val >= 0.6 else "#fb7185")
+            chips.append(badge_pill(f"Conf: {c_val:.0%}", c_color, f"{c_color}22"))
+        else:
+            c_color = "#34d399" if c_val >= 80 else ("#f59e0b" if c_val >= 60 else "#fb7185")
+            chips.append(badge_pill(f"Conf: {c_val:.0f}%", c_color, f"{c_color}22"))
+    if confused:
+        chips.append(badge_pill("Confused", "#fca5a5", "rgba(127,29,29,0.5)"))
 
     st.markdown(
         f'<div style="display:flex;gap:8px;flex-wrap:wrap;margin:0.3rem 0 0.8rem 0;">'
@@ -643,61 +521,68 @@ def call_detail_panel(row: dict[str, Any], call_detail: dict[str, Any] | None, i
         unsafe_allow_html=True,
     )
 
-    # 4. Flags
-    if flags and isinstance(flags, list) and len(flags) > 0:
-        _default_style = f"background:{COLORS['bg_elevated']};color:{COLORS['text_secondary']};"
-        flag_parts = []
-        for f in (f for f in flags if f):
-            style, label = FLAG_STYLES.get(f, (_default_style, _fmt(f)))
-            flag_parts.append(
-                f'<span style="{style}'
-                f'padding:3px 10px;border-radius:6px;font-size:0.78em;font-weight:500;">'
-                f'{_html.escape(label)}</span>'
+    # 4. Confusion section
+    if confused:
+        section_divider("Category Confusion")
+        if brands_mentioned and isinstance(brands_mentioned, list) and len(brands_mentioned) > 0:
+            brand_pills = " ".join(
+                badge_pill(str(b), "#f59e0b", "rgba(245,158,11,0.15)")
+                for b in brands_mentioned if b
             )
-        flag_html = " ".join(flag_parts)
-        st.markdown(
-            f'<div style="margin:0.5rem 0 0.6rem 0;display:flex;align-items:center;gap:8px;'
-            f'flex-wrap:wrap;">'
-            f'<span style="font-size:0.68rem;font-weight:600;'
-            f'letter-spacing:0.08em;text-transform:uppercase;color:{COLORS["text_muted"]};">'
-            f'FLAGS</span>{flag_html}</div>',
-            unsafe_allow_html=True,
-        )
-
-    # 5. Confusion signals + who they thought they called
-    if brand_confused:
-        section_divider("Brand Confusion")
-        if isinstance(raw, dict):
-            who = raw.get("who_they_thought_they_called", "")
-            if who:
-                who_label = WHO_LABELS.get(who, _fmt(str(who)))
+            st.markdown(
+                f'<div style="margin:0.4rem 0;"><span style="font-size:0.74rem;font-weight:600;'
+                f'letter-spacing:0.06em;text-transform:uppercase;color:{COLORS["text_muted"]};'
+                f'margin-right:8px;">Brands Mentioned</span>{brand_pills}</div>',
+                unsafe_allow_html=True,
+            )
+        if confusion_points and isinstance(confusion_points, list) and len(confusion_points) > 0:
+            for point in (p for p in confusion_points if p):
                 st.markdown(
-                    f'<div style="font-size:0.88rem;color:{COLORS["amber"]};'
-                    f'margin-bottom:0.5rem;">'
-                    f'Thought they called: <strong>{_html.escape(who_label)}</strong></div>',
+                    f'<div style="padding:0.4rem 0.8rem;margin:0.3rem 0;'
+                    f'border-left:3px solid {COLORS["rose"]};'
+                    f'background:rgba(251,113,133,0.06);'
+                    f'border-radius:0 8px 8px 0;'
+                    f'color:{COLORS["text_secondary"]};font-size:0.84rem;'
+                    f'line-height:1.5;">'
+                    f'{_html.escape(str(point))}</div>',
                     unsafe_allow_html=True,
                 )
-    if signals and isinstance(signals, list) and len(signals) > 0:
-        if not brand_confused:
-            section_divider("Confusion Signals")
-        for sig in (s for s in signals if s):
+        if channel:
             st.markdown(
-                f'<div style="padding:0.4rem 0.8rem;margin:0.3rem 0;'
-                f'border-left:3px solid {COLORS["rose"]};'
-                f'background:rgba(251,113,133,0.06);'
-                f'border-radius:0 8px 8px 0;'
-                f'color:{COLORS["text_secondary"]};font-size:0.84rem;'
-                f'line-height:1.5;">'
-                f'{_html.escape(str(sig))}</div>',
+                f'<div style="margin:0.4rem 0;"><span style="font-size:0.74rem;font-weight:600;'
+                f'letter-spacing:0.06em;text-transform:uppercase;color:{COLORS["text_muted"]};'
+                f'margin-right:8px;">Channel</span>'
+                f'{badge_pill(_fmt(str(channel)), "#22d3ee", "rgba(34,211,238,0.15)")}</div>',
                 unsafe_allow_html=True,
             )
 
-    # 6. Raw analysis JSON
-    if raw:
-        with st.expander("Raw Analysis JSON", expanded=False):
-            if isinstance(raw, str):
-                try:
-                    raw = json.loads(raw)
-                except Exception:
-                    pass
-            st.json(raw)
+    # 5. Agent performance
+    if any(v is not None for v in (empathy, education, closing)):
+        section_divider("Agent Performance")
+        agent_chips = []
+        for label, score in [("Empathy", empathy), ("Education", education), ("Closing", closing)]:
+            if score is not None:
+                s_color = "#34d399" if score >= 7 else ("#f59e0b" if score >= 5 else "#fb7185")
+                agent_chips.append(badge_pill(f"{label}: {score}/10", s_color, f"{s_color}22"))
+        st.markdown(
+            f'<div style="display:flex;gap:8px;flex-wrap:wrap;margin:0.3rem 0 0.6rem 0;">'
+            f'{"".join(agent_chips)}</div>',
+            unsafe_allow_html=True,
+        )
+
+    # 6. Needs review
+    if needs_review:
+        review_html = (
+            f'<div style="margin:0.5rem 0;padding:0.5rem 0.8rem;'
+            f'border:1px solid {COLORS["amber"]};border-radius:8px;'
+            f'background:rgba(245,158,11,0.08);">'
+            f'<span style="font-size:0.74rem;font-weight:600;color:{COLORS["amber"]};">'
+            f'NEEDS REVIEW</span>'
+        )
+        if review_reason:
+            review_html += (
+                f'<br><span style="font-size:0.82rem;color:{COLORS["text_secondary"]};">'
+                f'{_html.escape(str(review_reason))}</span>'
+            )
+        review_html += '</div>'
+        st.markdown(review_html, unsafe_allow_html=True)
